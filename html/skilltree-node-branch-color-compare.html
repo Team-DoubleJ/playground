@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ko">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  skilltree-node-branch-color-compare.html — 「스킬트리 노드 브랜치색」 **비교 목업**(2026-10-03 · owner 판정 대기).
+  무엇의 비교본인가: 연구소 스킬트리 그래프(IMGUI)의 노드 몸통.
+    「현행 = 모양(스탯/자원/무기/각성/코어)당 1색으로 구운 시트를 흰색으로 그린다(브랜치 미사용)」
+    ↔ 「제안 = 시트를 회색(무채색)으로 다시 굽고 그릴 때 브랜치색을 곱한다」.
+  ⚠ 화면 정본이 아니다 — 비주얼 정본은 html/ui-prototype.html, 시트 생성 정본은 html/node-sprites.html 이다.
+    이 파일은 그 둘을 건드리지 않는 비교본이고, 정본·게임 코드·시트 PNG 반영은 owner 승인 뒤의 일이다.
+  ✅ 2026-10-04 owner 판정 1a 2a 3a 4a 5a → 포팅: 시트 = stat/lang `_sheet`(회색 면) + `_ring_sheet`(흰 테두리·글로우), 그리기 = MvpGameController.SkillTreeScreen.cs
+     `ResolveSkillTreeNodeBodyTints`(아래 recTints 의 기본값 분기와 같은 식). 「현행」 열은 포팅 **전** 그림(모양색 한 겹)이다. 색공간은 엔진 캡처 대조 전.
+  ⚠ 제안 열은 **목업 합성값**이다. 게임 구현도 엔진 캡처 대조도 아직 없다.(← 작성 당시 문장 · 포팅 기록은 윗줄)
+    IMGUI 가 Linear 프로젝트에서 틴트를 어느 색공간으로 곱하는지 이 리포 안에서 확인하지 못해 「색공간」 토글 3가지로 차이를 보인다.
+  색: 전부 기존 값 — 브랜치색 = GetBranchTheme 리터럴, 각성 금 = UiTheme.asset kAwakenGold, 가능 청록·모양 고유색 = node-sprites.html.
+    신규 색 0(틴트는 기존 색끼리의 보간·곱뿐). 값은 보조 js 가 소스에서 읽어 옮긴 것이다.
+  의존: 같은 폴더의 skilltree-node-branch-color-data.js 1개(생성물 · 외부 CDN 0). file:// 로 열어도 동작한다.
+  ?target=a|b|c &locked=tint|gray &avail=teal|branch &special=lang|own|branch &sat=1 &bright=1 &space=gamma|linconv|linraw &cvd=none|protan|deutan|tritan &p=<진행도>
+-->
+<title>노드 브랜치색 비교</title>
+<style>
+/* 레이아웃: 고정 토글 → 트리 구역(기본 줌 · 최소 줌) → 상태별 표 → 구분성 → 겹치는 요소·색공간 → 포팅 → 결정 문항.
+   UI 레시피 비교 목업들과 같은 틀. 색은 전부 게임 토큰. */
+:root {
+  color-scheme: dark;
+  --bg-deep: #070c11; --bg: #0a1017; --surface-b: #0e1620;
+  --btn-border: #26384a; --teal: #57d1b8; --text: #e2e8f0; --text-btn: #c9d6e2; --text-caption: #b9c6d3;
+  --muted: #7f8fa0; --rule: #1b2733;
+  --font-ui: "Jua", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --font-body: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --font-mono: Consolas, "SF Mono", Menlo, monospace;
+}
+html, body { background: var(--bg-deep); color: var(--text); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.6; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--font-ui); font-weight: 400; text-wrap: balance; margin: 0; }
+h1 { font-size: 30px; } h2 { font-size: 21px; }
+p { margin: 0; max-width: 78ch; color: var(--text-caption); }
+.lede { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+.warn { border-left: 3px solid var(--teal); padding: 6px 12px; background: var(--surface-b); font-size: 14px; max-width: none; }
+section { display: grid; gap: 14px; min-width: 0; }
+.sticky { position: sticky; top: 0; z-index: 5; background: var(--bg-deep); padding: 10px 0; border-bottom: 1px solid var(--rule); display: grid; gap: 6px; }
+.controls { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.controls .lab { font-size: 13px; color: var(--muted); min-width: 9.5em; }
+.seg { display: inline-flex; border: 1px solid var(--btn-border); border-radius: 8px; overflow: hidden; }
+.seg label { font-size: 13px; color: var(--text-btn); background: var(--surface-b); padding: 4px 10px; cursor: pointer; border-left: 1px solid var(--btn-border); white-space: nowrap; }
+.seg label:first-child { border-left: 0; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: #12332e; color: var(--teal); }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--teal); outline-offset: -2px; }
+.seg label .rec { font-size: 11px; color: var(--teal); margin-left: 4px; }
+input[type=range] { accent-color: var(--teal); width: 130px; }
+output { font: 500 13px var(--font-mono); color: var(--teal); min-width: 5ch; }
+.stage { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); padding: 12px; display: grid; gap: 12px; }
+.stage .ttl { font: 500 12px var(--font-mono); letter-spacing: .08em; color: var(--muted); }
+.stage .ttl b { color: var(--text); font-weight: 500; }
+.pair { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+figure { margin: 0; display: grid; gap: 6px; justify-items: start; }
+figcaption { font: 400 12px var(--font-mono); color: var(--muted); }
+canvas { display: block; border-radius: 6px; }
+.hint { font-size: 13px; color: var(--muted); max-width: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text-caption); align-items: center; }
+.chip { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.chip i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.matrix { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+table { border-collapse: collapse; }
+.matrix table { width: max-content; }
+.matrix th, .matrix td { padding: 4px 8px; border-bottom: 1px solid var(--rule); vertical-align: middle; text-align: center; }
+.matrix th { font: 500 12px var(--font-mono); letter-spacing: .04em; color: var(--muted); white-space: nowrap; }
+.matrix th small { display: block; font-weight: 400; letter-spacing: 0; }
+.matrix td.state { font-size: 14px; white-space: nowrap; text-align: left; color: var(--text-caption); }
+.matrix td.state b { font-family: var(--font-ui); font-weight: 400; font-size: 16px; color: var(--text); }
+.matrix td.na canvas { opacity: .3; }
+.matrix td.cur { border-right: 1px solid var(--btn-border); }
+.matrix tr.grp td { border-top: 2px solid var(--btn-border); }
+table.m { font: 400 12px var(--font-mono); color: var(--text-caption); }
+table.m th, table.m td { padding: 4px 8px; border-bottom: 1px solid var(--rule); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.m th:first-child, table.m td:first-child { text-align: left; }
+table.m th { color: var(--muted); font-weight: 400; }
+table.m td.bad { background: #4a1f1f; color: #ffd0d0; }
+table.m td.near { background: #3d3212; color: #ffe9a8; }
+table.m td.self { color: #33414f; }
+table.m.l { width: 100%; }
+table.m.l td, table.m.l th { text-align: left; white-space: normal; vertical-align: top; }
+.tbl { overflow-x: auto; }
+.sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; }
+.note { border-top: 2px solid var(--btn-border); padding-top: 12px; display: grid; gap: 6px; min-width: 0; align-content: start; }
+.note h3 { margin: 0; font: 600 15px var(--font-body); color: var(--text); }
+.note p, .note li { font-size: 14px; color: var(--text-caption); }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+code { font-family: var(--font-mono); font-size: .9em; color: var(--text-btn); background: var(--surface-b); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.ask { border: 1px solid var(--teal); border-radius: 12px; padding: 18px 20px; display: grid; gap: 10px; background: #0b1a1b; }
+.ask h2 { color: var(--teal); }
+.ask ol { margin: 0; padding-left: 22px; display: grid; gap: 10px; color: var(--text-caption); }
+.ask li b { color: var(--text); font-weight: 600; }
+.ask b.rec { color: var(--teal); font-weight: 600; }
+.meter { font: 400 12px var(--font-mono); color: var(--muted); max-width: none; }
+@media (max-width: 760px) { .sticky { position: static; } .controls .lab { min-width: 0; width: 100%; } }
+</style>
+
+<div class="wrap">
+  <header class="lede">
+    <div class="eyebrow">스킬트리 · 노드 색 · 비교본</div>
+    <h1>노드 브랜치색 · 현행 vs 제안</h1>
+    <p class="warn"><b>비교본이며 정본이 아닙니다.</b> 화면 정본은 <code>html/ui-prototype.html</code>, 노드 시트 정본은 <code>html/node-sprites.html</code>이고 이 페이지는 둘 다 건드리지 않습니다. 제안 쪽은 목업 합성이며 게임 구현·엔진 캡처는 아직 없습니다.</p>
+    <p class="warn"><b>2026-10-04 owner 판정 <code>1a 2a 3a 4a 5a</code> → 포팅.</b> 아래 「제안」 열(토글 기본값)이 게임에 들어갔습니다 — 시트는 <code>node-sprites.html</code>의 회색 두 겹, 색 규칙은 <code>ResolveSkillTreeNodeBodyTints</code>. 「현행」 열과 본문은 판정 당시(포팅 전) 기록으로 남깁니다.</p>
+    <p>지금 스킬트리의 일반 노드는 브랜치와 상관없이 전부 같은 주황으로 보입니다. 노드 그림(시트)이 모양마다 한 색으로 구워져 있고, 그릴 때 브랜치를 쓰지 않기 때문입니다. 제안은 시트를 회색으로 다시 굽고, 그릴 때 요약 패널에서 이미 쓰는 브랜치색(자원 초록 · 전투 주황 · 자동화 보라 · 경제 노랑)을 입히는 것입니다.</p>
+    <p>아래 토글의 기본값이 추천안입니다. 토글을 바꾸면 이 페이지의 모든 그림이 같이 바뀝니다.</p>
+    <div class="legend" id="legend"></div>
+  </header>
+
+  <div class="sticky" id="controls"></div>
+
+  <section aria-labelledby="s1">
+    <h2 id="s1">실제 트리 한 구역 · 기본 줌 (실제 크기)</h2>
+    <p class="hint" id="s1-hint"></p>
+    <div class="controls" role="group" aria-label="진행도">
+      <span class="lab">진행도(코어에서 몇 칸까지 해금)</span>
+      <input id="p" type="range" step="1" aria-label="진행도 — 코어에서 간선으로 몇 칸까지 해금했는가">
+      <output id="p-out"></output>
+    </div>
+    <div class="stage" id="tree-z1">
+      <figure><figcaption class="ttl"><b>현행</b> · 스탯 노드는 브랜치와 무관하게 전부 주황</figcaption><canvas id="z1-cur"></canvas></figure>
+      <figure><figcaption class="ttl"><b>제안</b> · 회색 시트 × 브랜치색 (위 토글 적용)</figcaption><canvas id="z1-rec"></canvas></figure>
+    </div>
+  </section>
+
+  <section aria-labelledby="s2">
+    <h2 id="s2">같은 트리 · 최소 줌 (가장 멀리서 볼 때)</h2>
+    <p class="hint" id="s2-hint"></p>
+    <div class="stage"><div class="pair" id="tree-zmin">
+      <figure><figcaption class="ttl"><b>현행</b></figcaption><canvas id="zm-cur"></canvas></figure>
+      <figure><figcaption class="ttl"><b>제안</b></figcaption><canvas id="zm-rec"></canvas></figure>
+    </div></div>
+  </section>
+
+  <section aria-labelledby="s3">
+    <h2 id="s3">상태별 표 · 모양 5종 × 상태 3 × 브랜치</h2>
+    <p class="hint">맨 왼쪽이 현행, 오른쪽 다섯 칸이 제안입니다. 흐리게 나온 칸은 지금 데이터에 없는 조합입니다(예: 육각은 자원 브랜치에만 있음). 맨 아래 세 줄은 해금 순간에 잠깐 지나가는 반짝임 3장(스탯 모양 대표)입니다.</p>
+    <div class="matrix"><table id="state-table"></table></div>
+    <p class="meter">현행 열 검산(2026-10-03 · 헤드리스 Chrome): 이 페이지가 그리는 현행 시트 5장 × 6칸을 실제 PNG(<code>shapes/*_sheet.png</code>)와 전 픽셀 대조 — 최대 차 2.8/255 · 차 &gt; 3 인 픽셀 0개.</p>
+    <p class="meter" id="fidelity"></p>
+  </section>
+
+  <section aria-labelledby="s4">
+    <h2 id="s4">구분성 점검 · 색끼리 얼마나 다른가</h2>
+    <p class="hint">숫자는 두 색의 지각 색차(CIEDE2000 ΔE)입니다. 클수록 잘 구분됩니다. 기준선은 이 목업의 눈대중 규칙입니다 — <span class="sw" style="background:#4a1f1f"></span>10 미만 = 헷갈림 · <span class="sw" style="background:#3d3212"></span>10~20 = 가까움. 위쪽 「색각」 토글을 바꾸면 이 표도 그 시야 기준으로 다시 계산됩니다.</p>
+    <div class="tbl"><table class="m" id="de-table"></table></div>
+    <div class="tbl"><table class="m l" id="de-pairs"></table></div>
+  </section>
+
+  <section aria-labelledby="s5">
+    <h2 id="s5">노드 위에 같이 그려지는 것 · 색공간</h2>
+    <div class="notes">
+      <div class="note"><h3>그리는 순서(코드에서 확인)</h3>
+        <ul>
+          <li>각성 강조 링 → <b>시트 몸통</b> → 가운데 아이콘 → 오른쪽 위 배지(+ / UP / MAX) → 선택 표시 → 라벨 2줄. (<code>DrawSkillTreeNodes</code>)</li>
+          <li>브랜치색이 들어가는 곳은 <b>시트 몸통 한 단계뿐</b>입니다. 아이콘·배지·라벨은 지금 색 그대로 위에 올라갑니다.</li>
+          <li>이 목업은 선택 표시(금색 8% 원)와 안개(먼 노드 72% 흐림)는 그리지 않습니다.</li>
+        </ul></div>
+      <div class="note"><h3>색이 겹치는 곳</h3>
+        <ul>
+          <li><b>아이콘</b>은 종류마다 자기 색이 있습니다(클릭 주황 · 체인 하늘 · 워커 초록 …). 몸통색과 아이콘색이 같은 계열이면 아이콘이 묻힙니다 — 전투(주황) 몸통 위의 주황 아이콘.</li>
+          <li><b>배지</b>: 「+」 초록 · 「UP」 금 · 「MAX」 짙은 초록. 초록 「+」가 자원(초록) 노드 위에, 금 「UP」이 경제(노랑) 노드 위에 올라갑니다.</li>
+          <li><b>가능 청록 테두리</b>는 자원 초록과 이웃한 색입니다(아래 표의 숫자 참고).</li>
+          <li><b>각성 금 링</b>: 코드상으로는 잠김 그림(어두운 몸통)에 금색을 곱해 그립니다. 어두운 색 × 금 = 여전히 어두워서, 소스 산술로는 금색으로 거의 안 보입니다(엔진 캡처로는 확인하지 않음). 시트의 잠김 그림이 밝아지면 이 링이 달라집니다.</li>
+        </ul></div>
+      <div class="note"><h3>브랜치가 섞여 있는 방식</h3>
+        <ul>
+          <li>브랜치는 구역으로 뭉쳐 있지 않고 <b>한 줄기 안에서 번갈아</b> 나옵니다(자원-전투-자원-경제 …). 그래서 색을 입히면 「구역 색」이 아니라 「줄기 위의 색 구슬」처럼 보입니다.</li>
+          <li id="count-line"></li>
+        </ul></div>
+      <div class="note"><h3>색공간 — 확인한 것과 못 한 것</h3>
+        <ul>
+          <li>확인: 프로젝트는 Linear 색공간(<code>ProjectSettings m_ActiveColorSpace: 1</code>) · 노드 시트는 sRGB 텍스처(<code>sRGBTexture: 1</code>) · 그래프는 IMGUI <code>GUI.DrawTextureWithTexCoords</code> + <code>GUI.color</code>.</li>
+          <li><b>못 확인</b>: IMGUI 내장 셰이더가 <code>GUI.color</code>를 어느 공간에서 곱하고 섞는지. 리포에 그 셰이더 소스도 엔진 캡처 기록도 없습니다. Unity 문서 기억으로는 「IMGUI 는 감마로 그린다」지만 이 프로젝트에서 재지 않았습니다.</li>
+          <li>그래서 토글 3가지: <b>감마</b>(기본) · <b>리니어·색 변환</b> · <b>리니어·색 그대로</b>. 앞의 둘은 곱한 색이 같고 반투명 가장자리·글로우만 다릅니다. 셋째는 색이 눈에 띄게 밝고 옅어집니다.</li>
+          <li>포팅 전에 엔진 캡처 한 장으로 어느 쪽인지 정해야 합니다.</li>
+        </ul></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s6">
+    <h2 id="s6">포팅하면 바뀌는 것</h2>
+    <div class="tbl"><table class="m l">
+      <tr><th style="width:22%">항목</th><th>내용</th></tr>
+      <tr><td>시트 5장 재출력</td><td><code>Assets/Resources/Sprites/Nodes/shapes/{stat,lang,weapon,awaken,core}_sheet.png</code>. <code>html/node-sprites.html</code>의 <code>SHAPE_COLORS</code>·<code>drawNodeCell</code>을 회색 램프로 바꿔 <code>npm run capture:resources:nodes</code>로 다시 굽는다. 시트 PNG 는 게이트 미분류라 승인서 선행(지난 재출력과 같은 절차).</td></tr>
+      <tr><td>그리기 횟수 — 선택지에 따라 다름</td><td><b>한 번 그리기로 되는 조합</b>: 「면 전체」 + 「가능 테두리도 브랜치색」. 시트 6칸 · 장수 그대로, <code>DrawSkillTreeNodeStateSprite</code>에 색 인자만 추가.<br><b>두 겹이 필요한 조합</b>: 「테두리만」 · 「면 옅게 + 테두리 진하게」 · 「가능 청록 유지」(청록 테두리가 브랜치색에 곱해져 탁해지므로 따로 그려야 함). 면 그림과 테두리 그림을 나눠 굽고(시트 칸 2배 또는 10장) 노드당 2회 그린다. 「가능 청록 유지」만 고르면 가능 상태 노드에서만 2회.</td></tr>
+      <tr><td>그리기 코드</td><td><code>MvpGameController.UI.cs</code> <code>DrawSkillTreeNodes</code>: 몸통을 <code>GetBranchTheme(node.Branch).color</code>로 틴트(이미 있는 <code>DrawSkillTreeNodeStateSpriteTinted</code> 재사용 가능). 리빌 3프레임도 같은 틴트.</td></tr>
+      <tr><td>폴백 경로</td><td>시트를 못 읽었을 때의 절차 도형은 <code>bodyColor</code>/<code>frameColor</code>를 노드별 <code>node.BaseColor</code>에서 만든다(브랜치색 아님). 같이 브랜치색으로 맞출지, 폴백은 그대로 둘지 정해야 한다.</td></tr>
+      <tr><td>같은 시트를 쓰는 다른 곳</td><td>① <code>LabNodePanelsView.ApplyCategoryIcon</code> — 노드 상세의 모양 아이콘이 시트 0번 칸(잠김)을 <code>node.BaseColor</code> 92%로 곱해 쓴다. 잠김 칸의 밝기·테두리가 바뀌면 이 아이콘도 바뀐다. ② <code>DrawSkillTreeAwakenEmphasis</code> — 각성 링이 0번 칸에 금색을 곱한다(위 「색이 겹치는 곳」). 둘 다 재출력 뒤 눈으로 확인 필요.</td></tr>
+      <tr><td>게이트 앵커</td><td><code>docs/tools/loop-risk-symbols.json</code> 앵커가 <code>MvpGameController.UI.cs</code>의 <code>GetSkillTreeNodeIconIndex</code> 구역(<code>:933-949</code>)에 줄 번호로 핀돼 있다. <code>DrawSkillTreeNodes</code>(<code>:485</code>~)는 그 <b>위</b>라 줄이 늘면 핀이 같은 폭으로 밀린다(균일 밀림은 자가 보정). 두 핀 <b>사이</b>에는 줄을 넣지 말 것.</td></tr>
+      <tr><td>재출력 수용 기준</td><td>지난 재출력 플랜(<code>docs/archives/skill-tree/skilltree-state-sheet-reexport-plan.md</code> §6)을 그대로: ① 프레임 바깥 2열·2행 α ≤ 2 ② 인접 프레임 경계 α 차 ≤ 2 ③ 몸통 bbox 불변(스탯·코어 102×102 · 육각 88×102 · 팔각 94×94 · 마름모 68×102 — <code>SkillTreeNodeCardFill*</code> 상수의 근거) ④ <b>해금 칸 중심 RGB 핀은 새 회색 값으로 다시 정해야 한다</b>(기존 핀은 모양색 기준이라 그대로는 깨진다) ⑤ 변경 파일 = 시트만, <code>.meta</code>·UV 무변경. 두 겹으로 가면 칸 수가 바뀌므로 ⑤의 meta·UV 무변경은 성립하지 않는다.</td></tr>
+      <tr><td>계약 테스트</td><td>게임 코드를 고치므로 EditMode 테스트 동반: 브랜치색 값 핀 · 「몸통 틴트 = 그 노드 브랜치의 색」 결과 계약 · 그리기 순서 계약(강조 → 몸통 → 아이콘 → 배지 → 라벨).</td></tr>
+      <tr><td>정본 반영</td><td>승인 뒤 <code>html/ui-prototype.html</code> 「노드 상태 레퍼런스」와 <code>html/node-sprites.html</code>에 반영. 07-09 테마 정렬 플랜의 결정 4(「노드 테마색 링·필터는 후속 플랜으로」)가 이것으로 닫힌다.</td></tr>
+    </table></div>
+  </section>
+
+  <section class="ask" aria-labelledby="s7">
+    <h2 id="s7">결정해 주실 것</h2>
+    <p><code>1a 2a 3a 4a 5a</code>처럼 한 줄로 답해 주시면 됩니다. 전부 추천대로면 「전부 추천」.</p>
+    <ol>
+      <li><b>색을 노드의 어디에 입힐까요?</b><br>a. 노드 면 전체를 브랜치색으로 <b class="rec">(추천 — 멀리서도 색이 바로 보이고 구현이 가장 단순)</b> · b. 테두리만 브랜치색, 면은 회청색 · c. 면은 옅게, 테두리는 진하게</li>
+      <li><b>아직 못 여는(잠긴) 노드에도 색을 보일까요?</b><br>a. 어두운 채로 색이 옅게 비친다 <b class="rec">(추천 — 열기 전에도 어느 브랜치인지 보임)</b> · b. 잠긴 노드는 지금처럼 색 없이 어둡게</li>
+      <li><b>「지금 살 수 있음」을 알리는 청록 테두리는 어떻게 할까요?</b><br>a. 청록 테두리 그대로, 면만 브랜치색 <b class="rec">(추천 — 살 수 있는 노드가 색과 상관없이 같은 신호로 보임)</b> · b. 테두리도 브랜치색으로(초록 「+」 배지와 점선 링만 남음 · 구현은 더 단순)</li>
+      <li><b>모양이 다른 특수 노드는요?</b><br>a. 육각(자원 해금)만 브랜치색, 무기·각성·코어는 지금 색 유지 <b class="rec">(추천 — 육각의 지금 색이 전투 주황과 가까워서 헷갈림)</b> · b. 특수 노드는 전부 지금 색 유지 · c. 특수 노드도 전부 브랜치색</li>
+      <li><b>색 세기는요?</b><br>a. 요약 패널의 브랜치색 그대로 <b class="rec">(추천 — 요약과 노드가 같은 색으로 읽힘)</b> · b. 조금 차분하게(채도 80%) — 위 슬라이더로 미리 볼 수 있습니다</li>
+    </ol>
+    <p class="hint">참고: 경제(노랑)·코어(금)·각성 금은 서로 매우 가까운 색입니다. 위 구분성 표에 숫자가 있습니다. 색을 새로 정하는 일은 이 목업의 범위 밖이라 문항에 넣지 않았습니다 — 필요하면 따로 말씀해 주세요.</p>
+  </section>
+</div>
+
+<script src="skilltree-node-branch-color-data.js"></script>
+<script>
+'use strict';
+(function () {
+  var D = window.NodeBranchColorData, S = D.sprites, K = D.K;
+  var CELL = D.sheet.cell, R = D.sheet.r;                       // node-sprites.html drawShapeRow: CELL=128, r=50
+  var SHAPES = ['stat', 'lang', 'weapon', 'awaken', 'core'];
+  var SHAPE_LABEL = { stat: '스탯 · 둥근 사각', lang: '자원 해금 · 육각', weapon: '무기 · 팔각', awaken: '각성 · 마름모', core: '코어 · 원' };
+  var CATEGORY = { core: '핵심', awaken: '각성', weapon: '무기', lang: '자원', stat: '스탯' };   // GetSkillTreeNodeCategoryLabel
+  var BR = ['Resource', 'Combat', 'Automation', 'Economy', 'Core'];
+  var hex = function (h) { return S.hexRgb(h).map(function (v) { return v / 255; }); };
+  var TEAL = hex(D.sheet.unlockableBorder);                     // node-sprites.html drawNodeCell: unlockable borderCol
+  var LOCK_RING = hex(D.sheet.lockedBorder);                    // node-sprites.html drawNodeCell: locked borderCol
+  var NEUTRAL = D.branchDefault.rgb;                            // GetBranchTheme default(「미지정」)
+  var GOLD = D.tokens.kAwakenGold.slice(0, 3);                  // UiTheme.asset kAwakenGold
+  var BG = D.tokens.BackgroundDeep.slice(0, 3);                 // UiTheme.asset BackgroundDeep
+  var WHITE = [1, 1, 1];
+  var lerp3 = function (a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; };
+  var css = function (c, a) { return 'rgba(' + Math.round(c[0] * 255) + ',' + Math.round(c[1] * 255) + ',' + Math.round(c[2] * 255) + ',' + (a == null ? 1 : a) + ')'; };
+
+  // ── 옵션 ─────────────────────────────────────────────────────────────────────────────
+  var qs = new URLSearchParams(location.search);
+  var O = {
+    target: qs.get('target') || 'a', locked: qs.get('locked') || 'tint', avail: qs.get('avail') || 'teal',
+    special: qs.get('special') || 'lang', sat: parseFloat(qs.get('sat') || '1'), bright: parseFloat(qs.get('bright') || '1'),
+    space: qs.get('space') || 'gamma', cvd: qs.get('cvd') || 'none', p: qs.get('p') ? parseInt(qs.get('p'), 10) : null
+  };
+  var GROUPS = [
+    ['target', '① 색을 입히는 곳', [['a', '면 전체', 1], ['b', '테두리만'], ['c', '면 옅게 + 테두리 진하게']]],
+    ['locked', '② 잠긴 노드', [['tint', '옅게 색 보임', 1], ['gray', '무채색']]],
+    ['avail', '③ 가능 테두리', [['teal', '청록 유지', 1], ['branch', '브랜치색']]],
+    ['special', '④ 특수 모양', [['lang', '육각만 브랜치색', 1], ['own', '전부 지금 색'], ['branch', '전부 브랜치색']]],
+    ['space', '색공간(미확인)', [['gamma', '감마'], ['linconv', '리니어·색 변환'], ['linraw', '리니어·색 그대로']]],
+    ['cvd', '색각', [['none', '일반'], ['protan', '적색약'], ['deutan', '녹색약'], ['tritan', '청색약']]]
+  ];
+  (function buildControls() {
+    var host = document.getElementById('controls'), html = '';
+    GROUPS.forEach(function (g, gi) {
+      if (gi === 0 || gi === 2 || gi === 4) html += '<div class="controls">';
+      html += '<span class="lab">' + g[1] + '</span><span class="seg" role="radiogroup" aria-label="' + g[1] + '">';
+      g[2].forEach(function (o) {
+        html += '<label><input type="radio" name="' + g[0] + '" value="' + o[0] + '"' + (O[g[0]] === o[0] ? ' checked' : '') + '>' + o[1] + (o[2] ? '<span class="rec">추천</span>' : '') + '</label>';
+      });
+      html += '</span>';
+      if (gi === 1 || gi === 3 || gi === 5) html += '</div>';
+    });
+    html += '<div class="controls"><span class="lab">⑤ 색 세기 · 채도</span><input id="sat" type="range" min="0.4" max="1" step="0.05" value="' + O.sat + '" aria-label="채도"><output id="sat-out"></output>' +
+            '<span class="lab" style="min-width:0">밝기</span><input id="bright" type="range" min="0.6" max="1.2" step="0.05" value="' + O.bright + '" aria-label="밝기"><output id="bright-out"></output></div>';
+    host.innerHTML = html;
+    host.addEventListener('change', function (e) { if (e.target.type === 'radio') { O[e.target.name] = e.target.value; renderAll(); } });
+    ['sat', 'bright'].forEach(function (id) { document.getElementById(id).addEventListener('input', function (e) { O[id] = parseFloat(e.target.value); renderAll(); }); });
+  })();
+
+  // ── 색 유틸 ──────────────────────────────────────────────────────────────────────────
+  var LUT = new Float32Array(256);
+  for (var i = 0; i < 256; i++) { var c = i / 255; LUT[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+  var toLin = function (c) { return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  var toSrgb = function (l) { l = Math.max(0, Math.min(1, l)); return l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(l, 1 / 2.4) - 0.055; };
+  // 색각 시뮬레이션 — Machado·Oliveira·Fernandes(2009) 중증도 1.0 행렬, 리니어 RGB 에 적용
+  var CVD = {
+    protan: [0.152286, 1.052583, -0.204868, 0.114503, 0.786281, 0.099216, -0.003882, -0.048116, 1.051998],
+    deutan: [0.367322, 0.860646, -0.227968, 0.280085, 0.672501, 0.047413, -0.011820, 0.042940, 0.968881],
+    tritan: [1.255528, -0.076749, -0.178779, -0.078411, 0.930809, 0.147602, 0.004733, 0.691367, 0.303900]
+  };
+  function cvdRgb(rgb, kind) {
+    var m = CVD[kind]; if (!m) return rgb;
+    var r = toLin(rgb[0]), g = toLin(rgb[1]), b = toLin(rgb[2]);
+    return [toSrgb(m[0] * r + m[1] * g + m[2] * b), toSrgb(m[3] * r + m[4] * g + m[5] * b), toSrgb(m[6] * r + m[7] * g + m[8] * b)];
+  }
+  function applyCvd(canvas) {
+    var m = CVD[O.cvd]; if (!m) return;
+    var x = canvas.getContext('2d'), img = x.getImageData(0, 0, canvas.width, canvas.height), d = img.data;
+    for (var q = 0; q < d.length; q += 4) {
+      var r = LUT[d[q]], g = LUT[d[q + 1]], b = LUT[d[q + 2]];
+      d[q] = Math.round(toSrgb(m[0] * r + m[1] * g + m[2] * b) * 255);
+      d[q + 1] = Math.round(toSrgb(m[3] * r + m[4] * g + m[5] * b) * 255);
+      d[q + 2] = Math.round(toSrgb(m[6] * r + m[7] * g + m[8] * b) * 255);
+    }
+    x.putImageData(img, 0, 0);
+  }
+  function toLab(rgb) {
+    var r = toLin(rgb[0]), g = toLin(rgb[1]), b = toLin(rgb[2]);
+    var X = (0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047, Y = 0.2126729 * r + 0.7151522 * g + 0.0721750 * b, Z = (0.0193339 * r + 0.1191920 * g + 0.9503041 * b) / 1.08883;
+    var f = function (t) { return t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116; };
+    return [116 * f(Y) - 16, 500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))];
+  }
+  function de00(A, B) {
+    var rad = Math.PI / 180, deg = 180 / Math.PI, L1 = A[0], a1 = A[1], b1 = A[2], L2 = B[0], a2 = B[1], b2 = B[2];
+    var C1 = Math.hypot(a1, b1), C2 = Math.hypot(a2, b2), Cb = (C1 + C2) / 2, p7 = Math.pow(25, 7);
+    var G = 0.5 * (1 - Math.sqrt(Math.pow(Cb, 7) / (Math.pow(Cb, 7) + p7)));
+    var a1p = (1 + G) * a1, a2p = (1 + G) * a2, C1p = Math.hypot(a1p, b1), C2p = Math.hypot(a2p, b2);
+    var h1 = Math.atan2(b1, a1p) * deg; if (h1 < 0) h1 += 360;
+    var h2 = Math.atan2(b2, a2p) * deg; if (h2 < 0) h2 += 360;
+    var dL = L2 - L1, dC = C2p - C1p, dh = 0;
+    if (C1p * C2p !== 0) { dh = h2 - h1; if (dh > 180) dh -= 360; else if (dh < -180) dh += 360; }
+    var dH = 2 * Math.sqrt(C1p * C2p) * Math.sin(dh * rad / 2);
+    var Lb = (L1 + L2) / 2, Cbp = (C1p + C2p) / 2, hb = h1 + h2;
+    if (C1p * C2p !== 0) hb = Math.abs(h1 - h2) <= 180 ? (h1 + h2) / 2 : (h1 + h2 < 360 ? (h1 + h2 + 360) / 2 : (h1 + h2 - 360) / 2);
+    var T = 1 - 0.17 * Math.cos((hb - 30) * rad) + 0.24 * Math.cos(2 * hb * rad) + 0.32 * Math.cos((3 * hb + 6) * rad) - 0.20 * Math.cos((4 * hb - 63) * rad);
+    var dTh = 30 * Math.exp(-Math.pow((hb - 275) / 25, 2));
+    var Rc = 2 * Math.sqrt(Math.pow(Cbp, 7) / (Math.pow(Cbp, 7) + p7));
+    var Sl = 1 + 0.015 * Math.pow(Lb - 50, 2) / Math.sqrt(20 + Math.pow(Lb - 50, 2)), Sc = 1 + 0.045 * Cbp, Sh = 1 + 0.015 * Cbp * T;
+    var Rt = -Math.sin(2 * dTh * rad) * Rc;
+    return Math.sqrt(Math.pow(dL / Sl, 2) + Math.pow(dC / Sc, 2) + Math.pow(dH / Sh, 2) + Rt * (dC / Sc) * (dH / Sh));
+  }
+  var hueOf = function (rgb) { var l = toLab(rgb), h = Math.atan2(l[2], l[1]) * 180 / Math.PI; return h < 0 ? h + 360 : h; };
+
+  // 브랜치색 + 세기 슬라이더(채도 = 자기 밝기 회색과의 보간, 밝기 = 곱)
+  function branchColor(b) {
+    var c = (D.branches[b] || D.branchDefault).rgb, y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    return [0, 1, 2].map(function (k) { return Math.max(0, Math.min(1, (y + (c[k] - y) * O.sat) * O.bright)); });
+  }
+
+  // ── 시트 칸 ──────────────────────────────────────────────────────────────────────────
+  function mk(w, h) { var cv = document.createElement('canvas'); cv.width = w; cv.height = h; return cv; }
+  var cellCache = {};
+  // 현행: node-sprites.html 의 drawNodeCell 을 그대로 호출한다(= 지금 시트 PNG 와 같은 그림)
+  function curCell(shape, state) {
+    var k = 'cur/' + shape + '/' + state; if (cellCache[k]) return cellCache[k];
+    var cv = mk(CELL, CELL); S.drawNodeCell(cv.getContext('2d'), shape, state, CELL / 2, CELL / 2, R);
+    cv._key = k; return (cellCache[k] = cv);
+  }
+  // 제안: 같은 페인트 명령을 **흰색 기준**으로 두 겹(면 / 테두리+바깥 글로우)에 나눠 굽는다. 색은 그릴 때 곱한다.
+  //   drawNodeCell 과 한 줄씩 대응 — col → 흰색, mixColor 의 푸른 오프셋(4,8,14) → 무채색 9, 리터럴 테두리색(잠김·가능) → 흰색(틴트로 되돌린다).
+  //   2026-10-04 포팅 뒤: 이 그림은 정본 node-sprites.html 의 drawNodeCell(…, layer) 로 옮겨졌고(= 실제 시트 stat/lang _sheet · _ring_sheet),
+  //   여기서는 **정본 함수를 그대로 호출**한다(보조 js 가 정본을 글자 그대로 옮긴 사본).
+  function grayCell(shape, state, layer) {
+    var k = 'gray/' + shape + '/' + state + '/' + layer; if (cellCache[k]) return cellCache[k];
+    var cv = mk(CELL, CELL); S.drawNodeCell(cv.getContext('2d'), shape, state, CELL / 2, CELL / 2, R, layer);
+    cv._key = k; return (cellCache[k] = cv);
+  }
+  // 아이콘 칸(icons_sheet 한 칸 64px) — node-sprites.html drawIcons 와 같은 명령
+  function iconCell(idx) {
+    var k = 'icon/' + idx; if (cellCache[k]) return cellCache[k];
+    var cv = mk(64, 64), ctx = cv.getContext('2d'), ic = S.ICON_DEFS[idx];
+    ctx.save(); ctx.shadowBlur = 8; ctx.shadowColor = S.rgba(ic.color, 0.28); S.drawIconShape(ctx, idx, 32, 32, ic.color); ctx.restore();
+    cv._key = k; return (cellCache[k] = cv);
+  }
+  // 배지 칸(badges_sheet 한 칸 64px) — node-sprites.html drawBadges 와 같은 명령
+  function badgeCell(i) {
+    var k = 'badge/' + i; if (cellCache[k]) return cellCache[k];
+    var cv = mk(64, 64), ctx = cv.getContext('2d'), b = S.BADGES[i];
+    ctx.beginPath(); ctx.arc(32, 32, 22, 0, Math.PI * 2); ctx.fillStyle = b.color; ctx.shadowBlur = 16; ctx.shadowColor = b.shadow; ctx.fill(); ctx.shadowBlur = 0;
+    ctx.strokeStyle = b.stroke; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.font = i === 2 ? 'bold 12px Consolas' : 'bold 15px Consolas'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(b.symbol, 32, 32.5);
+    cv._key = k; return (cellCache[k] = cv);
+  }
+  var scaleCache = {};
+  function scaled(src, sx, sy, sw, sh, dw, dh) {
+    var k = src._key + '|' + sx + '|' + sw + '|' + dw.toFixed(2) + '|' + dh.toFixed(2); if (scaleCache[k]) return scaleCache[k];
+    var cv = mk(Math.max(1, Math.ceil(dw)), Math.max(1, Math.ceil(dh))), x = cv.getContext('2d');
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(src, sx, sy, sw, sh, 0, 0, dw, dh);
+    return (scaleCache[k] = x.getImageData(0, 0, cv.width, cv.height));
+  }
+
+  // ── 합성기: 실수 버퍼에 「텍스처 × 틴트」를 쌓는다. 색공간 3가지 ─────────────────────
+  //   gamma   : sRGB 값끼리 곱하고 sRGB 로 섞는다
+  //   linconv : 텍스처·틴트 둘 다 리니어로 풀어 곱하고 리니어로 섞는다
+  //   linraw  : 텍스처만 리니어로 풀고 틴트 숫자는 그대로 곱한다(색 변환 없이 정점색으로 실리는 경우)
+  function Scene(wd, ht) {
+    this.w = wd; this.h = ht; var n = wd * ht, lin = O.space !== 'gamma';
+    this.lin = lin; this.r = new Float32Array(n); this.g = new Float32Array(n); this.b = new Float32Array(n);
+    this.r.fill(lin ? toLin(BG[0]) : BG[0]); this.g.fill(lin ? toLin(BG[1]) : BG[1]); this.b.fill(lin ? toLin(BG[2]) : BG[2]);
+  }
+  Scene.prototype.blit = function (img, dx, dy, tint, alpha) {
+    var x0 = Math.round(dx), y0 = Math.round(dy), d = img.data, lin = this.lin, W = this.w, H = this.h;
+    var t = O.space === 'linconv' ? tint.map(toLin) : tint;
+    for (var y = 0; y < img.height; y++) {
+      var Y = y0 + y; if (Y < 0 || Y >= H) continue;
+      for (var x = 0; x < img.width; x++) {
+        var X = x0 + x; if (X < 0 || X >= W) continue;
+        var q = (y * img.width + x) * 4, a = d[q + 3] / 255 * alpha; if (a <= 0) continue;
+        var p = Y * W + X, ia = 1 - a;
+        var sr = (lin ? LUT[d[q]] : d[q] / 255) * t[0], sg = (lin ? LUT[d[q + 1]] : d[q + 1] / 255) * t[1], sb = (lin ? LUT[d[q + 2]] : d[q + 2] / 255) * t[2];
+        this.r[p] = sr * a + this.r[p] * ia; this.g[p] = sg * a + this.g[p] * ia; this.b[p] = sb * a + this.b[p] * ia;
+      }
+    }
+  };
+  Scene.prototype.sprite = function (src, sx, sy, sw, sh, dx, dy, dw, dh, tint, alpha) { this.blit(scaled(src, sx, sy, sw, sh, dw, dh), dx, dy, tint, alpha == null ? 1 : alpha); };
+  Scene.prototype.canvasLayer = function (cv) { cv._key = cv._key || 'tmp'; this.blit(cv.getContext('2d').getImageData(0, 0, cv.width, cv.height), 0, 0, WHITE, 1); };
+  Scene.prototype.flush = function (canvas) {
+    canvas.width = this.w; canvas.height = this.h;
+    var x = canvas.getContext('2d'), img = x.createImageData(this.w, this.h), o = img.data, lin = this.lin;
+    for (var k = 0, j = 0; k < this.w * this.h; k++, j += 4) {
+      o[j] = Math.round((lin ? toSrgb(this.r[k]) : Math.max(0, Math.min(1, this.r[k]))) * 255);
+      o[j + 1] = Math.round((lin ? toSrgb(this.g[k]) : Math.max(0, Math.min(1, this.g[k]))) * 255);
+      o[j + 2] = Math.round((lin ? toSrgb(this.b[k]) : Math.max(0, Math.min(1, this.b[k]))) * 255); o[j + 3] = 255;
+    }
+    x.putImageData(img, 0, 0); return x;
+  };
+
+  // ── 제안의 틴트 규칙 ─────────────────────────────────────────────────────────────────
+  function keepsOwnColor(shape) { return shape !== 'stat' && (O.special === 'own' || (O.special === 'lang' && shape !== 'lang')); }
+  function recTints(branch, state) {
+    var B = branchColor(branch), fill, ring;
+    if (state === 'locked') {
+      if (O.locked === 'gray') return { fill: WHITE, ring: LOCK_RING };
+      return { fill: O.target === 'b' ? WHITE : lerp3(WHITE, B, 0.6), ring: lerp3(LOCK_RING, B, 0.55) };
+    }
+    fill = O.target === 'a' ? B : O.target === 'b' ? NEUTRAL : lerp3(NEUTRAL, B, 0.5);
+    ring = state === 'unlockable' && O.avail === 'teal' ? TEAL : B;
+    return { fill: fill, ring: ring };
+  }
+  // 몸통(시트) 한 장을 dest 카드 rect 에 그린다 — GetSkillTreeNodeSheetDrawRect: 카드 / fill 비율, 중심 고정
+  function drawBody(scene, shape, branch, state, variant, cx, cy, size) {
+    var fillRatio = shape === 'weapon' ? K.SkillTreeNodeCardFillWeapon : K.SkillTreeNodeCardFillDefault, s = size / fillRatio, x = cx - s / 2, y = cy - s / 2;
+    if (variant === 'cur' || keepsOwnColor(shape)) { scene.sprite(curCell(shape, state), 0, 0, CELL, CELL, x, y, s, s, WHITE); return; }
+    var t = recTints(branch, state);
+    scene.sprite(grayCell(shape, state, 'fill'), 0, 0, CELL, CELL, x, y, s, s, t.fill);
+    scene.sprite(grayCell(shape, state, 'ring'), 0, 0, CELL, CELL, x, y, s, s, t.ring);
+  }
+
+  // ── 트리 구역 ────────────────────────────────────────────────────────────────────────
+  var N = D.nodes.map(function (a, i) { return { i: i, gx: a[0], gy: a[1], branch: a[2], shape: a[3], label: a[4], effect: a[5], maxLevel: a[6], depth: a[7], nb: a[8].slice() }; });
+  N.forEach(function (n) { n.adj = n.adj || []; n.nb.forEach(function (j) { n.adj.push(j); (N[j].adj = N[j].adj || []).push(n.i); }); });
+  var MULT = { awaken: K.SkillTreeAwakenNodeSizeMultiplier, weapon: K.SkillTreeWeaponNodeSizeMultiplier, core: K.SkillTreeCoreNodeSizeMultiplier };
+  function stateOf(n) {
+    if (n.depth <= O.p) return 'unlocked';
+    for (var k = 0; k < n.adj.length; k++) if (N[n.adj[k]].depth <= O.p) return 'unlockable';
+    return 'locked';
+  }
+  var FS_NAME = Math.round(K.SkillNodeLabelFontSize * K.SkillTreeUiScale);   // 16 × 1.18 → 19
+  var FS_SUB = 11;                                                           // 9 → EffectiveFontSize 하한으로 11 (ui-prototype.html 「노드 상태 레퍼런스」 규약)
+  var LH = function (fs) { return Math.ceil(fs * 1.2); };                    // UiLineHeight = ⌈fontSize × 1.20⌉
+  function renderTree(canvas, win, zoom, variant, pad) {
+    var cell = K.SkillTreeBaseCellSize * zoom, cols = win.x1 - win.x0 + 1, rows = win.y1 - win.y0 + 1;
+    var Wd = Math.round(cols * cell), Ht = Math.round(rows * cell + pad * 2), scene = new Scene(Wd, Ht);
+    var pos = function (n) { return [(n.gx - win.x0 + 0.5) * cell, pad + (win.y1 - n.gy + 0.5) * cell]; };
+    var inWin = N.filter(function (n) { return n.gx >= win.x0 && n.gx <= win.x1 && n.gy >= win.y0 && n.gy <= win.y1; });
+    var st = {}; N.forEach(function (n) { st[n.i] = stateOf(n); });
+    // 간선(약식 — 실제 게임은 텍스처 선 + 흐름 연출). 색 = UiTheme kSkillTreeAmbientArcColor / TextCaptionColor
+    var ev = mk(Wd, Ht), ex = ev.getContext('2d'); ex.lineCap = 'round'; ex.lineWidth = Math.max(1, 3 * zoom);
+    inWin.forEach(function (n) { n.adj.forEach(function (j) { var m = N[j]; var a = pos(n), b = pos(m), on = st[n.i] === 'unlocked' && st[m.i] === 'unlocked';
+      ex.strokeStyle = on ? css(D.tokens.kSkillTreeAmbientArcColor, 0.42) : css(D.tokens.TextCaptionColor, 0.14); ex.beginPath(); ex.moveTo(a[0], a[1]); ex.lineTo(b[0], b[1]); ex.stroke(); }); });
+    scene.canvasLayer(ev);
+    var labels = [];
+    inWin.forEach(function (n) {
+      var s = st[n.i], p = pos(n), size = Math.max(K.NodeMinSize, K.SkillTreeNodeSize * zoom * (MULT[n.shape] || 1) * K.SkillTreeUiScale);
+      var x = p[0] - size / 2, y = p[1] - size / 2, fillRatio = n.shape === 'weapon' ? K.SkillTreeNodeCardFillWeapon : K.SkillTreeNodeCardFillDefault;
+      // 1) 각성 강조 — DrawSkillTreeAwakenEmphasis: 잠김 칸(0) × kAwakenGold, rect 를 (3,2) 넓혀 시트 보정. 맥박 알파는 중간값.
+      if (n.shape === 'awaken') {
+        var ew = (size + K.SkillTreeAwakenRingOutset * 2) / fillRatio, eh = (size + K.SkillTreeAwakenRingOutsetY * 2) / fillRatio;
+        scene.sprite(curCell('awaken', 'locked'), 0, 0, CELL, CELL, p[0] - ew / 2, p[1] - eh / 2, ew, eh, GOLD, (K.AwakenRingAlphaMin + K.AwakenRingAlphaMax) / 2);
+      }
+      // 2) 몸통
+      drawBody(scene, n.shape, n.branch, s, variant, p[0], p[1], size);
+      // 3) 아이콘 — DrawSkillTreeNodeCenterIcon (코어는 없음). 자원 해금 노드는 게임에선 자원 스프라이트지만 여기선 폴백 아이콘.
+      var ii = D.iconIndex[n.effect];
+      if (n.shape !== 'core' && ii != null && S.ICON_DEFS[ii]) {
+        var isz = Math.max(14.4 * K.SkillTreeUiScale, size * 0.264), ic = s === 'unlocked' ? D.colors.iconUnlocked : s === 'unlockable' ? D.colors.iconUnlockable : D.colors.iconLocked;
+        var ins = K.SkillTreeIconSheetContentInset * 64;
+        scene.sprite(iconCell(ii), ins, ins, 64 - ins * 2, 64 - ins * 2, p[0] - isz / 2, y + isz * 0.92 - isz / 2, isz, isz, ic.slice(0, 3), ic[3]);
+      }
+      // 4) 배지 — DrawSkillTreeNodeActionBadge. 가정: 해금된 다단 노드는 「UP」, 1단 노드는 「MAX」.
+      var bi = n.shape === 'core' ? -1 : s === 'unlockable' ? 0 : s === 'unlocked' ? (n.maxLevel > 1 ? 1 : 2) : -1;
+      if (bi >= 0) { var bd = Math.max(15 * K.SkillTreeUiScale, size * 0.27), bs = bd * 1.4; scene.sprite(badgeCell(bi), 0, 0, 64, 64, x + size - bd * 0.82 - bs / 2, y + bd * 0.82 - bs / 2, bs, bs, WHITE); }
+      // 5) 라벨 2줄 — GetSkillTreeNodeLabelRect / SplitSkillTreeNodeLabelRect. 두 줄이 안 들어가면 안 그린다.
+      var two = LH(FS_NAME) + LH(FS_SUB);
+      if (size >= two) {
+        var bandH = Math.min(Math.max(two, size * K.SkillTreeNodeLabelBandHeightRatio), size);
+        var top = Math.min(Math.max(y + size * K.SkillTreeNodeLabelBandCenter - bandH / 2, y), Math.max(y, y + size - bandH)) + Math.max(0, (bandH - two) / 2);
+        labels.push({ x: p[0], y: top, name: n.label, cat: CATEGORY[n.shape], a: s === 'unlocked' ? D.colors.labelAlphaUnlocked : s === 'unlockable' ? D.colors.labelAlphaUnlockable : D.colors.labelAlphaLocked, w: size - K.SkillTreeNodeLabelSidePadding * 2 });
+      }
+    });
+    var x2 = scene.flush(canvas); x2.textAlign = 'center';
+    labels.forEach(function (l) {
+      x2.save(); x2.beginPath(); x2.rect(l.x - l.w / 2, l.y, l.w, LH(FS_NAME) + LH(FS_SUB)); x2.clip();
+      x2.font = 'bold ' + FS_NAME + 'px Pretendard, "Malgun Gothic", sans-serif'; x2.textBaseline = 'middle'; x2.fillStyle = css(D.colors.labelText, l.a); x2.fillText(l.name, l.x, l.y + LH(FS_NAME) / 2 + 1);
+      x2.font = FS_SUB + 'px Pretendard, "Malgun Gothic", sans-serif'; x2.textBaseline = 'alphabetic'; x2.fillStyle = css(D.colors.subLabelText, D.colors.subLabelText[3] * l.a); x2.fillText(l.cat, l.x, l.y + LH(FS_NAME) + LH(FS_SUB) - 3);
+      x2.restore();
+    });
+    applyCvd(canvas);
+    return { n: N.filter(function (n) { return n.gx >= win.x0 && n.gx <= win.x1 && n.gy >= win.y0 && n.gy <= win.y1; }), st: st };
+  }
+  // 구역: 네 브랜치가 섞인 남쪽 줄기(코어 아래). 기본 줌 9×7칸 · 최소 줌 12×12칸.
+  var WIN1 = { x0: -8, x1: 0, y0: -15, y1: -9 }, WINM = { x0: -6, x1: 5, y0: -18, y1: -7 };
+  (function initProgress() {
+    var ds = N.filter(function (n) { return n.gx >= WIN1.x0 && n.gx <= WIN1.x1 && n.gy >= WIN1.y0 && n.gy <= WIN1.y1; }).map(function (n) { return n.depth; }).sort(function (a, b) { return a - b; });
+    var el = document.getElementById('p'); el.min = ds[0] - 2; el.max = ds[ds.length - 1];
+    if (O.p == null) O.p = ds[Math.floor(ds.length * 0.4)];
+    el.value = O.p; el.addEventListener('input', function () { O.p = parseInt(el.value, 10); renderAll(); });
+  })();
+
+  // ── 상태별 표 ────────────────────────────────────────────────────────────────────────
+  function cellCanvas(shape, branch, state, variant) {
+    var cv = mk(84, 84), scene = new Scene(84, 84);
+    drawBody(scene, shape, branch, state, variant, 42, 42, 58);
+    scene.flush(cv); applyCvd(cv); return cv;
+  }
+  function renderTable() {
+    var tb = document.getElementById('state-table'); tb.textContent = '';
+    var head = tb.insertRow(), th = function (h) { var e = document.createElement('th'); e.innerHTML = h; head.appendChild(e); };
+    th('모양 · 상태'); th('현행');
+    BR.forEach(function (b) { th('제안 · ' + D.branches[b].label + '<small>전체 ' + D.counts[b] + '개</small>'); });
+    var ST = [['locked', '잠김'], ['unlockable', '가능'], ['unlocked', '해금']];
+    var row = function (shape, state, label, first, sub) {
+      var tr = tb.insertRow(); if (first) tr.className = 'grp';
+      var td = tr.insertCell(); td.className = 'state'; td.innerHTML = (first ? '<b>' + SHAPE_LABEL[shape] + '</b><br>' : '') + label + (sub ? '<br><small style="color:var(--muted)">' + sub + '</small>' : '');
+      td = tr.insertCell(); td.className = 'cur'; td.appendChild(cellCanvas(shape, 'Core', state, 'cur'));
+      BR.forEach(function (b) { td = tr.insertCell(); var cnt = D.shapeBranch[shape + '/' + b] || 0; if (!cnt) { td.className = 'na'; td.title = '지금 데이터에 없는 조합'; } else td.title = cnt + '개'; td.appendChild(cellCanvas(shape, b, state, 'rec')); });
+    };
+    SHAPES.forEach(function (sh) {
+      var has = BR.filter(function (b) { return D.shapeBranch[sh + '/' + b]; }).map(function (b) { return D.branches[b].label + ' ' + D.shapeBranch[sh + '/' + b]; }).join(' · ');
+      ST.forEach(function (s, k) { row(sh, s[0], s[1], k === 0, k === 0 ? '실제: ' + has : ''); });
+    });
+    [['uf1', '해금 순간 1/3'], ['uf2', '해금 순간 2/3'], ['uf3', '해금 순간 3/3']].forEach(function (s, k) { row('stat', s[0], s[1], k === 0, ''); });
+  }
+  // 회색 시트에 원래 모양색을 곱하면 현행이 되살아나는가 — 해금 칸 전 픽셀 대조(감마 합성)
+  function fidelity() {
+    var keep = O.space; O.space = 'gamma';
+    var parts = SHAPES.map(function (sh) {
+      var a = new Scene(CELL, CELL), b = new Scene(CELL, CELL), col = hex(S.SHAPE_COLORS[sh]);
+      a.blit(curCell(sh, 'unlocked').getContext('2d').getImageData(0, 0, CELL, CELL), 0, 0, WHITE, 1);
+      b.blit(grayCell(sh, 'unlocked', 'fill').getContext('2d').getImageData(0, 0, CELL, CELL), 0, 0, col, 1);
+      b.blit(grayCell(sh, 'unlocked', 'ring').getContext('2d').getImageData(0, 0, CELL, CELL), 0, 0, col, 1);
+      var mx = 0, sum = 0, n = CELL * CELL;
+      for (var k = 0; k < n; k++) { var d = Math.max(Math.abs(a.r[k] - b.r[k]), Math.abs(a.g[k] - b.g[k]), Math.abs(a.b[k] - b.b[k])) * 255; mx = Math.max(mx, d); sum += d; }
+      return sh + ' 최대 ' + mx.toFixed(0) + ' · 평균 ' + (sum / n).toFixed(2);
+    });
+    O.space = keep;
+    document.getElementById('fidelity').textContent = '검산 — 회색 두 겹에 원래 모양색을 곱해 현행 해금 칸과 전 픽셀 대조(/255): ' + parts.join(' | ') + '. 차이는 현행 시트의 푸른 오프셋(mixColor +4,+8,+14)을 무채색으로 바꾼 데서 나온다.';
+  }
+
+  // ── 구분성 ───────────────────────────────────────────────────────────────────────────
+  function renderDistinct() {
+    var list = [
+      ['자원', branchColor('Resource'), 'GetBranchTheme Resource'], ['전투', branchColor('Combat'), 'GetBranchTheme Combat'],
+      ['자동화', branchColor('Automation'), 'GetBranchTheme Automation'], ['경제', branchColor('Economy'), 'GetBranchTheme Economy'],
+      ['코어(요약색)', branchColor('Core'), 'GetBranchTheme Core'], ['각성 금 링', GOLD, 'UiTheme kAwakenGold'],
+      ['가능 청록', TEAL, 'node-sprites unlockable'], ['육각 지금 색', hex(S.SHAPE_COLORS.lang), 'SHAPE_COLORS.lang'],
+      ['팔각 지금 색', hex(S.SHAPE_COLORS.weapon), 'SHAPE_COLORS.weapon'], ['스탯 지금 색', hex(S.SHAPE_COLORS.stat), 'SHAPE_COLORS.stat']
+    ];
+    var sim = function (kind) { return list.map(function (l) { return toLab(cvdRgb(l[1], kind)); }); };
+    var cur = sim(O.cvd), t = document.getElementById('de-table'), h = '<tr><th>ΔE (' + ({ none: '일반 시야', protan: '적색약', deutan: '녹색약', tritan: '청색약' })[O.cvd] + ')</th><th>색상각</th>';
+    list.forEach(function (l) { h += '<th>' + l[0] + '</th>'; }); h += '</tr>';
+    list.forEach(function (l, a) {
+      h += '<tr><td title="' + l[2] + '"><span class="sw" style="background:' + css(cvdRgb(l[1], O.cvd)) + '"></span>' + l[0] + '</td><td>' + hueOf(cvdRgb(l[1], O.cvd)).toFixed(0) + '°</td>';
+      list.forEach(function (m, b) { if (a === b) { h += '<td class="self">—</td>'; return; } var d = de00(cur[a], cur[b]); h += '<td class="' + (d < 10 ? 'bad' : d < 20 ? 'near' : '') + '">' + d.toFixed(1) + '</td>'; });
+      h += '</tr>';
+    });
+    t.innerHTML = h;
+    var kinds = [['none', '일반'], ['protan', '적색약'], ['deutan', '녹색약']], labs = kinds.map(function (k) { return sim(k[0]); }), rows = [];
+    for (var a = 0; a < list.length; a++) for (var b = a + 1; b < list.length; b++) {
+      var ds = labs.map(function (L) { return de00(L[a], L[b]); });
+      if (Math.min.apply(null, ds) < 20) rows.push([list[a], list[b], ds]);
+    }
+    rows.sort(function (x, y) { return x[2][0] - y[2][0]; });
+    var p = '<tr><th>가까운 색 쌍(어느 시야에서든 ΔE 20 미만)</th><th>일반</th><th>적색약</th><th>녹색약</th></tr>';
+    rows.forEach(function (r) {
+      p += '<tr><td><span class="sw" style="background:' + css(r[0][1]) + '"></span>' + r[0][0] + ' ↔ <span class="sw" style="background:' + css(r[1][1]) + '"></span>' + r[1][0] + '</td>';
+      r[2].forEach(function (d) { p += '<td class="' + (d < 10 ? 'bad' : d < 20 ? 'near' : '') + '">' + d.toFixed(1) + '</td>'; }); p += '</tr>';
+    });
+    document.getElementById('de-pairs').innerHTML = p;
+  }
+
+  // ── 전체 ─────────────────────────────────────────────────────────────────────────────
+  function renderAll() {
+    scaleCache = {};
+    document.getElementById('sat-out').textContent = Math.round(O.sat * 100) + '%';
+    document.getElementById('bright-out').textContent = Math.round(O.bright * 100) + '%';
+    document.getElementById('p-out').textContent = O.p + '칸';
+    document.getElementById('legend').innerHTML = BR.map(function (b) { return '<span class="chip"><i style="background:' + css(cvdRgb(branchColor(b), O.cvd)) + '"></i>' + D.branches[b].label + ' ' + D.counts[b] + '</span>'; }).join('') +
+      '<span class="chip"><i style="background:' + css(cvdRgb(TEAL, O.cvd)) + '"></i>가능 테두리</span><span class="chip"><i style="background:' + css(cvdRgb(GOLD, O.cvd)) + '"></i>각성 금</span>';
+    var z1 = 1, zm = K.SkillTreeMinZoom;
+    renderTree(document.getElementById('z1-cur'), WIN1, z1, 'cur', 14);
+    var info = renderTree(document.getElementById('z1-rec'), WIN1, z1, 'rec', 14);
+    renderTree(document.getElementById('zm-cur'), WINM, zm, 'cur', 16);
+    var infoM = renderTree(document.getElementById('zm-rec'), WINM, zm, 'rec', 16);
+    var tally = function (inf) { var c = {}, s = { locked: 0, unlockable: 0, unlocked: 0 }; inf.n.forEach(function (n) { c[n.branch] = (c[n.branch] || 0) + 1; s[inf.st[n.i]]++; });
+      return inf.n.length + '노드(' + BR.filter(function (b) { return c[b]; }).map(function (b) { return D.branches[b].label + ' ' + c[b]; }).join(' · ') + ') · 해금 ' + s.unlocked + ' / 가능 ' + s.unlockable + ' / 잠김 ' + s.locked; };
+    var size1 = (K.SkillTreeNodeSize * K.SkillTreeUiScale).toFixed(2);
+    document.getElementById('s1-hint').textContent = '코어 왼쪽 아래 구역의 격자 x ' + WIN1.x0 + '~' + WIN1.x1 + ' · y ' + WIN1.y0 + '~' + WIN1.y1 + ' 구역을 줌 1.0 그대로 그렸습니다(칸 간격 ' + K.SkillTreeBaseCellSize + ' · 노드 ' + size1 + '). ' + tally(info) +
+      '. 상태는 「코어에서 간선으로 N칸 이내 = 해금, 그 이웃 = 가능」으로 만든 가정이고 슬라이더로 바꿀 수 있습니다. 간선은 약식입니다.';
+    document.getElementById('s2-hint').textContent = '줌 ' + zm + '(최소). 칸 간격 ' + (K.SkillTreeBaseCellSize * zm).toFixed(1) + ' · 노드는 하한 ' + K.NodeMinSize + '에 붙고 스탯 노드 라벨은 안 그려집니다(두 줄이 안 들어감 · 더 큰 무기·각성만 코드 규칙대로 잘린 라벨이 남음). 글자가 없으니 색과 모양만으로 읽어야 하는 거리입니다. 격자 x ' + WINM.x0 + '~' + WINM.x1 + ' · y ' + WINM.y0 + '~' + WINM.y1 + ' · ' + tally(infoM) + '.';
+    document.getElementById('count-line').textContent = '노드 ' + D.nodes.length + '개: ' + BR.map(function (b) { return D.branches[b].label + ' ' + D.counts[b]; }).join(' · ') + '. 특수 모양은 ' + ['lang', 'weapon', 'awaken', 'core'].map(function (sh) { return SHAPE_LABEL[sh].split(' · ')[1] + ' ' + BR.filter(function (b) { return D.shapeBranch[sh + '/' + b]; }).map(function (b) { return D.shapeBranch[sh + '/' + b] + '(' + D.branches[b].label + ')'; }).join('+'); }).join(' · ') +
+      '뿐이고 나머지 ' + BR.reduce(function (a, b) { return a + (D.shapeBranch['stat/' + b] || 0); }, 0) + '개가 스탯 모양입니다.';
+    renderTable(); renderDistinct(); fidelity();
+  }
+  renderAll();
+  window.__ready = true;
+})();
+</script>
+</html>

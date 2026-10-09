@@ -1,0 +1,519 @@
+<title>융기 카드 레시피 비교</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 레이아웃: 실제 화면에 나오는 카드 N종을 「현행 / 레시피」 두 줄로 같은 크기·같은 축척에 그린다 → 모서리 확대 → 굽는 텍스처 → 바뀌는 것 → owner 판정.
+   패널 목업(ui-recipe-panel-compare.html)과 같은 틀. 색은 전부 게임 토큰(UiTheme.asset · ui-prototype.html :root). 신규 색 0.
+   합성은 처음부터 리니어(ui-recipe-linear-composite.js) — 게임은 Linear 색공간이다(묶음 2 사고). */
+:root {
+  color-scheme: dark;
+  --bg-deep: #070c11; --bg: #0b1218; --surface-card: #0a1017; --surface-b: #0e1620;
+  --btn-border: #26384a; --teal: #57d1b8; --text: #e2e8f0; --text-btn: #c9d6e2; --text-caption: #b9c6d3;
+  --muted: #7f8fa0; --rule: #1b2733;
+  --font-title: "Black Han Sans", "Jua", sans-serif;
+  --font-ui: "Jua", "IBM Plex Sans KR", sans-serif;
+  --font-body: "IBM Plex Sans KR", "Malgun Gothic", sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, monospace;
+}
+html, body { background: var(--bg-deep); color: var(--text); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.6; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--font-ui); font-weight: 400; text-wrap: balance; margin: 0; }
+h1 { font-size: 30px; } h2 { font-size: 21px; }
+p { margin: 0; max-width: 72ch; color: var(--text-caption); }
+.lede { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+section { display: grid; gap: 14px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.controls .lab { font-size: 13px; color: var(--muted); }
+.seg { font: 500 13px var(--font-mono); color: var(--text-btn); background: var(--surface-b); border: 1px solid var(--btn-border); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.seg[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
+.seg:focus-visible, input:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text-btn); cursor: pointer; }
+.chk input { accent-color: var(--teal); }
+.stage { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+.pair { display: flex; flex-wrap: wrap; gap: 6px 28px; padding: 20px 24px; align-items: flex-start; border-top: 1px solid var(--rule); }
+.pair:first-child { border-top: 0; }
+.pair .ttl { flex: 1 0 100%; font: 500 13px var(--font-mono); color: var(--text-btn); }
+.pair .ttl span { color: var(--muted); }
+figure { margin: 0; display: grid; gap: 6px; }
+figcaption { font: 400 12px var(--font-mono); color: var(--muted); }
+canvas.px { image-rendering: pixelated; display: block; }
+.hint { font-size: 13px; color: var(--muted); }
+.zoom { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+.zoom .row { display: flex; flex-wrap: wrap; gap: 22px; padding: 20px; }
+.sheet { display: flex; flex-wrap: wrap; gap: 18px; padding: 20px; border: 1px solid var(--rule); border-radius: 12px;
+  background-color: #0c1218; background-image: linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%), linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%);
+  background-size: 12px 12px; background-position: 0 0, 6px 6px; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.note { border-top: 2px solid var(--btn-border); padding-top: 12px; display: grid; gap: 6px; min-width: 0; align-content: start; }
+.note h3 { margin: 0; font: 600 15px var(--font-body); color: var(--text); }
+.note p, .note li { font-size: 14px; color: var(--text-caption); }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+code { font-family: var(--font-mono); font-size: .9em; color: var(--text-btn); background: var(--surface-b); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.ask { border: 1px solid var(--teal); border-radius: 12px; padding: 18px 20px; display: grid; gap: 8px; background: color-mix(in srgb, var(--teal) 6%, var(--bg)); }
+.ask h2 { color: var(--teal); }
+.ask ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--text-caption); }
+.meter { font: 400 12px var(--font-mono); color: var(--muted); }
+.meter b { color: var(--teal); font-weight: 500; }
+table.m { border-collapse: collapse; font: 400 12px var(--font-mono); color: var(--text-caption); }
+table.m th, table.m td { padding: 4px 10px; border-bottom: 1px solid var(--rule); text-align: right; font-variant-numeric: tabular-nums; }
+table.m th:first-child, table.m td:first-child { text-align: left; }
+table.m th { color: var(--muted); font-weight: 400; }
+.tbl { overflow-x: auto; }
+</style>
+
+<div class="wrap">
+  <header class="lede">
+    <div class="eyebrow">UI 레시피 · 묶음 3 · 융기 카드 <code>CanvasUi.Elevate</code> + <code>CanvasUi.Fill</code></div>
+    <h1>융기 카드 · 현행 vs 레시피</h1>
+    <p class="meter" id="engine-line">엔진 대조(맵 선택 카드 · Unity 리니어 RenderTexture): 현행 열 표본 최대 3/255 · 안쪽 평균 차 0.4 / 레시피 ×1.25 안쪽 평균 엔진 26.3 vs 목업 26.8(차 0.5) · 이음매 단차 없음(인접 행 최대 2.2, 위·아래 가장자리 베벨) · 모서리 밖 누출 0</p>
+    <p>지금 게임의 카드는 코드로 그립니다: 둥근 채움 위에 위에서 옅어지는 램프와 상단 1.5px 하이라이트 막대를 얹습니다. 레시피판은 버튼·패널처럼
+      흰 바탕 레이어를 미리 구워 두고, 채움색은 지금처럼 각 화면이 정합니다(선택·잠김·등급으로 색을 바꾸는 카드도 그대로 동작합니다).
+      바뀌는 것은 하이라이트가 모서리 호를 따라 휘는 것, 안쪽 베벨 빛이 더해지는 것, 그리고 그림자와 모서리 장식입니다.</p>
+    <p><b>owner 확정(2026-10-02)</b> — 질감 ×1.25 · 결 끔 · 상단 림·베벨 빛 켬 · 그림자·모서리 장식 둘 다 켬 · <code>Fill</code>만 쓰는 24곳은 지금 그대로 · 이미 병합된 패널(FramePanel 18곳)에서도 결을 뺍니다. 아래 기본값이 그 확정값이고 게임(<code>CanvasUi.ElevateCard</code>)이 굽는 한 벌과 같습니다. 체크박스는 비교용입니다.</p>
+    <p>카드는 패널보다 작고 개수가 많아서 패널의 질감을 그대로 쓰면 과할 수 있습니다. 아래에서 실제 화면에 가장 많이 나오는 카드로 비교해 주세요.</p>
+  </header>
+
+  <section aria-labelledby="s1">
+    <h2 id="s1">화면에 놓았을 때</h2>
+    <div class="controls" role="group" aria-label="보기 옵션">
+      <span class="lab">화면 축척</span>
+      <button class="seg" data-scale="1" aria-pressed="true">×1</button>
+      <button class="seg" data-scale="0.664" aria-pressed="false">×0.664</button>
+      <span class="lab">질감 세기</span>
+      <input id="k" type="range" min="0.5" max="2" step="0.25" value="1.25" aria-label="질감 세기">
+      <output id="k-out" style="font:500 13px var(--font-mono);color:var(--teal)">×1.25</output>
+    </div>
+    <div class="controls" role="group" aria-label="레시피 레이어">
+      <span class="lab">레시피 레이어</span>
+      <label class="chk"><input type="checkbox" id="opt-rim" checked> 상단 림(호를 따라)</label>
+      <label class="chk"><input type="checkbox" id="opt-bevel" checked> 베벨 빛</label>
+      <label class="chk"><input type="checkbox" id="opt-grain"> 결</label>
+      <label class="chk"><input type="checkbox" id="opt-shadow" checked> 그림자</label>
+      <label class="chk"><input type="checkbox" id="opt-corner" checked> 모서리 장식</label>
+    </div>
+    <p class="meter" id="meter" aria-live="polite"></p>
+    <div class="stage" id="stage"></div>
+    <p class="hint">게임과 같은 <b>리니어 블렌딩</b>으로 합성했습니다. 한 칸이 게임 픽셀 하나(×1)입니다. 카드 바탕은 카드가 실제로 놓이는 면(패널 면 또는 메뉴 바탕)입니다. 글자·아이콘은 자리 표시용입니다.</p>
+  </section>
+
+  <section aria-labelledby="s2">
+    <h2 id="s2">왼쪽 위 모서리 4배 확대</h2>
+    <div class="zoom"><div class="row" id="zoom-row"></div></div>
+  </section>
+
+  <section aria-labelledby="s3">
+    <h2 id="s3">레시피가 굽는 텍스처</h2>
+    <p id="sheet-lede">반경 4벌(14 · 11 · 8 · 7) × 레이어 5장(그림자 · 면 · 램프 · 광택 · 모서리 장식)입니다. 결은 패널의 결 타일을 그대로 다시 써서 새 텍스처가 없습니다. 전부 흰색이나 회색 바탕이고 색은 게임이 입힙니다.
+      점선이 9-slice 경계입니다. 면·광택은 경계가 반경과 같아서 지금처럼 짧은 변이 2×반경 이상이면 됩니다. 램프는 지금 코드와 같이 좌우 경계만 있고 세로는 카드 높이 전체로 한 장이 늘어납니다. 모서리 장식만 경계가 6단위 더 깁니다.</p>
+    <div class="sheet" id="sheet"></div>
+  </section>
+
+  <section aria-labelledby="s4">
+    <h2 id="s4">포팅하면 바뀌는 것</h2>
+    <div class="notes" id="notes">
+      <div class="note"><h3>그대로 두는 것</h3>
+        <ul><li>채움색과 테두리(색·굵기)는 지금처럼 각 화면이 정합니다. 채움색을 런타임에 바꾸는 4곳(무기 목록 행, 서랍 무기 행, 장비 슬롯 행, 뽑기 카드)과 테두리색을 바꾸는 8곳도 그대로 동작합니다.</li>
+          <li>테두리 링은 이번 묶음 범위 밖이라 지금 코드 그대로 그립니다.</li>
+          <li>최소 크기 조건은 지금과 같습니다(짧은 변이 2×반경 이상). 이 조건 때문에 코드로 돌아가는 카드는 0곳입니다.</li></ul></div>
+      <div class="note"><h3>바뀌는 것</h3>
+        <ul><li>상단 하이라이트가 모서리 호를 따라 휩니다. 지금은 반경 0.6만큼 물린 직선 막대라 모서리에서 끊깁니다.</li>
+          <li>안쪽 베벨 빛이 더해집니다(결은 owner 판정으로 뺐습니다). 세기 ×1.25에서 카드 안쪽 평균이 지금보다 조금 밝아집니다(아래 표).</li>
+          <li>위에서 옅어지는 램프는 지금 코드와 같은 구조(세로 한 장)입니다. ×1.25에서 곡선도 지금과 같고, 질감 세기를 올리면 램프가 아래로 길어집니다.</li></ul></div>
+      <div class="note"><h3>적용 범위(확정)</h3>
+        <ul><li>대상은 <code>Elevate</code> 31곳입니다. 굽는 반경은 14·11·8·7 네 벌이고, 요청한 반경 이하에서 가장 큰 것을 씁니다. 28곳이 정확히 맞고, 소재 슬롯(10)만 8로 근사합니다.</li>
+          <li>제외(지금 코드 유지): 세션 종료 버튼의 테두리 뒷판(2px 링에서만 보임), 설정 슬라이더 손잡이(밝은 알약, 반경 13), 런 HUD 아키 토큰 칩(반경 17).</li>
+          <li><code>Fill</code>만 쓰는 24곳(트랙·칩·안쪽 면·베일)은 지금 코드 그대로입니다(판정 ④ ⓐ).</li></ul></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s5">
+    <h2 id="s5">질감 세기 슬라이더가 실제로 바꾸는 양</h2>
+    <p>카드 안쪽(가장자리 4단위 안) 평균 밝기입니다(0–255, 세 채널 평균). 현행은 슬라이더와 무관합니다. 묶음 2에서 결을 어두운 면에 곱해 슬라이더 차가 3.8/255밖에 안 났던 것을 막으려고, 레시피의 질감은 빛으로 더합니다.</p>
+    <div class="tbl"><table class="m" id="mtable"></table></div>
+  </section>
+
+  <section class="ask" aria-labelledby="s6">
+    <h2 id="s6">owner 판정 (2026-10-02 확정)</h2>
+    <p>① ⓐ ×1.25 · ② 결 <b>끔</b>(카드 전부 · 패널도 같이 뺌 — <i>"b"</i>) · ③ ⓒ 그림자·모서리 장식 둘 다 켬 · ④ ⓐ 지금 코드 그대로. 아래는 그때 드린 질문 원문입니다.</p>
+    <ol id="asks">
+      <li><b>질감 세기</b> — ⓐ 패널과 같은 ×1.25 · ⓑ 카드는 한 단계 낮게 ×1.0 (카드는 작고 개수가 많아 화면 전체가 밝아질 수 있습니다)</li>
+      <li><b>결</b> — ⓐ 모든 융기 카드에 결 · ⓑ 짧은 변이 100 이상인 큰 카드(맵 카드, 뽑기 카드, 젬 타일)에만, 목록 행은 결 없이</li>
+      <li><b>그림자 · 모서리 장식</b>(위 체크박스) — ⓐ 둘 다 끔 · ⓑ 그림자만 켬 · ⓒ 둘 다 켬 (모서리 장식은 짧은 변이 2×(반경+6) 미만인 3곳에서는 자동으로 빠집니다)</li>
+      <li><b>Fill만 쓰는 24곳</b>(마지막 「결과 재화 행」) — ⓐ 지금 코드 그대로(권장: 트랙·칩·베일이라 융기가 아님) · ⓑ 면 레이어(가장자리 그늘)만 레시피로</li>
+    </ol>
+  </section>
+</div>
+
+<script src="ui-recipe-panel-bake.js"></script>
+<script src="ui-recipe-card-bake.js"></script>
+<script src="ui-recipe-linear-composite.js"></script>
+<script>
+(function () {
+  'use strict';
+  // ── 게임 토큰 — Assets/Resources/UI/UiTheme.asset 값(= ui-prototype.html :root). 신규 색 0.
+  //    렌더 검증 스크립트가 이 값을 UiTheme.asset 과 대조한다(드리프트면 실패).
+  var T = /*THEME*/{
+    surfaceCard: '#0a1017',     // SurfaceCardColor (0.039, 0.063, 0.09)
+    overlayPanel: '#0a1017',    // OverlayPanelColor
+    surfRaisedA: '#16202c',     // SurfaceRaisedTopColor (0.086, 0.125, 0.173)
+    surfRaisedB: '#0e1620',     // SurfaceRaisedBottomColor (0.055, 0.086, 0.125)
+    textBtn: '#c9d6e2',         // TextBtnColor (0.788, 0.839, 0.886)
+    hairline: '#1b2836',        // HairlineColor (0.106, 0.157, 0.212)
+    textTitle: '#eaf3f2', textCaption: '#b9c6d3', teal: '#57d1b8', gold: '#f5e859',
+    bg: '#0b1218'               // 메뉴 바탕 --bg
+  }/*END*/;
+  function hex(h) { h = h.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16), 1]; }
+  function col(v) { return typeof v === 'string' ? hex(v) : v; }
+  function rgba(c) { c = col(c); return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (c[3] == null ? 1 : c[3]) + ')'; }
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
+  // ── 대표 카드 — 호출부 조사(노출 많은 순). w·h·r·fill·bg·border·elevate·content 는 호출부 값 그대로.
+  //   bg = 카드가 실제로 놓이는 면: 연구소·합성 탭 본문 = OverlayPanel #0a1017 · 장비 탭 판 = OverlayShellPanel ≈ #0f1424 ·
+  //        메인메뉴 = --bg #0b1218 · 런 HUD = --field-surface #0c1621
+  var CARDS = /*CARDS*/[
+    // 1 · 노출 1위 — 젬 인벤토리 타일(소켓 탭 r7 · 뽑기 탭 ×1.15 r8) ×보유 젬 수. 채움 CardSurface · 테두리 ButtonBorder 1px(등급색 1↔2px 매 프레임)
+    { name: '젬 인벤토리 타일', where: 'SocketsView.GemInventoryTile ×N', reps: '소켓·뽑기 공용', w: 120, h: 120, r: 7, fill: '#0a1017', bg: '#0a1017',
+      elevate: true, border: [38, 56, 74, 1], th: 1, zoom: true,
+      content: [{ t: 'box', x: 38, y: 34, w: 44, h: 44, color: [191, 156, 254, 0.9] }, { t: 'text', v: 'T3', x: 10, y: 108, size: 13, color: '#b9c6d3' }] },
+    // 2 · 런 HUD 패널 8종(런 내내) — 대표 = 골드 344×60 r14 · RunHudPanel · RunHudGoldPanelBorder(.92,.76,.28,.88) 1.7
+    { name: '런 HUD 골드 패널', where: 'RunHudView.BuildPanel ×8종', reps: '런 상시', w: 344, h: 60, r: 14, fill: '#0a1017', bg: '#0c1621',
+      elevate: true, border: [235, 194, 71, 0.88], th: 1.7, zoom: true,
+      content: [{ t: 'text', v: '골드', x: 18, y: 30, size: 15, color: '#b9c6d3' }, { t: 'text', v: '12,345', x: 326, y: 31, size: 24, align: 'right', color: '#f5e859', font: '"Black Han Sans", Jua, sans-serif' }] },
+    // 3 · 무기 목록 행 ×10 — 296×46 r11 · 채움 SurfaceRaisedTop α.85 (ListRow.Sync 가 매 프레임 대입)
+    { name: '무기 목록 행', where: 'ArmamentWeaponView.ListRow ×10', reps: '연구소 무기 탭', w: 296, h: 46, r: 11, fill: [22, 32, 44, 0.85], bg: '#0a1017',
+      elevate: true, zoom: true,
+      content: [{ t: 'text', v: 'T2', x: 14, y: 23, size: 13, color: '#7f8fa0' }, { t: 'text', v: '광선 드릴', x: 44, y: 23, size: 16, color: '#e2e8f0', font: 'Jua, sans-serif' }] },
+    // 3b · 같은 행의 선택+장착 상태 — 채움 = Lerp(black, MenuCursor, .29) α.95 · 테두리 MenuCursor α.9 1.4 (호출부가 색을 바꾸는 계약)
+    { name: '무기 목록 행 · 선택+장착', where: 'ListRow.Sync 런타임 색', reps: '색 계약 확인', w: 296, h: 46, r: 11, fill: [25, 61, 53, 0.95], bg: '#0a1017',
+      elevate: true, border: [87, 209, 184, 0.9], th: 1.4,
+      content: [{ t: 'text', v: 'T2', x: 14, y: 23, size: 13, color: '#57d1b8' }, { t: 'text', v: '광선 드릴', x: 44, y: 23, size: 16, color: '#eaf3f2', font: 'Jua, sans-serif' }] },
+    // 4 · 장비 슬롯 행 ×7 — 264×56 r11 · SurfaceRaisedBottom · 테두리 ButtonHover(.24,.3,.44) α.80 1px
+    { name: '장비 슬롯 행', where: 'EquipmentView.SlotRow ×7', reps: '장비 탭 사이드바', w: 264, h: 56, r: 11, fill: '#0e1620', bg: '#0f1424',
+      elevate: true, border: [61, 77, 112, 0.8], th: 1,
+      content: [{ t: 'box', x: 12, y: 12, w: 32, h: 32, color: [201, 162, 39, 0.35] }, { t: 'text', v: '투구', x: 56, y: 22, size: 15, color: '#e2e8f0', font: 'Jua, sans-serif' }, { t: 'text', v: 'T4 · 세대 2', x: 56, y: 40, size: 12, color: '#7f8fa0' }] },
+    // 5 · 연구소 서랍 행 ×12(헤더 4 · 무기 4 · 자원 4) — 대표 = 무기 행 373×37 r11 · SurfaceRaisedTop α.90 · AchievementAccent α.72 1px
+    { name: '스킬트리 서랍 무기 행', where: 'LabNodePanelsView.WeaponRow ×4', reps: '서랍 행 ×12 중', w: 373, h: 37, r: 11, fill: [22, 32, 44, 0.9], bg: '#0f1424',
+      elevate: true, border: [87, 209, 184, 0.72], th: 1,
+      content: [{ t: 'box', x: 14, y: 15, w: 7, h: 7, color: [87, 209, 184, 1] }, { t: 'text', v: '레이저', x: 30, y: 19, size: 14, color: '#e2e8f0' }, { t: 'text', v: '활성', x: 358, y: 19, size: 13, align: 'right', color: '#57d1b8' }] },
+    // 6 · 합성 등급 행 ×5 — 560×34 r8 · CardSurface · 테두리 등급색 α.25(비선택)
+    { name: '합성 등급 행', where: 'GemFusionView.GradeRow ×5', reps: '합성 탭', w: 560, h: 34, r: 8, fill: '#0a1017', bg: '#0a1017',
+      elevate: true, border: [191, 156, 254, 0.25], th: 1, zoom: true,
+      content: [{ t: 'text', v: '희귀', x: 14, y: 17, size: 14, color: '#bf9cfe' }, { t: 'text', v: '×12', x: 546, y: 17, size: 14, align: 'right', color: '#b9c6d3' }] },
+    // 7 · 메인메뉴 맵 선택 카드 — 422×182 r14 · SurfaceCard · Hairline 1.2 (선택 시 MenuGoldText)
+    { name: '맵 선택 카드', where: 'MainMenuView.BuildMapSelector', reps: '메인메뉴 상시', w: 422, h: 182, r: 14, fill: '#0a1017', bg: '#0b1218',
+      elevate: true, border: '#1b2836', th: 1.2,
+      content: [{ t: 'text', v: 'MAP 2', x: 22, y: 34, size: 14, color: '#7f8fa0', font: '"IBM Plex Mono", monospace' }, { t: 'text', v: '구리 광맥', x: 22, y: 66, size: 26, color: '#eaf3f2', font: '"Black Han Sans", Jua, sans-serif' }] },
+    // 8 · 장비 뽑기 카드 ×3 — 359×532 r14 · OverlayShellPanel(.06,.08,.14,.98) · ButtonBorder 2px · 안쪽 Fill r11 OverlayShellPanel α.88(inset 14)
+    { name: '장비 뽑기 카드', where: 'EquipmentView.RevealedCard ×3', reps: '장비 탭 보드', w: 359, h: 532, r: 14, fill: [15, 20, 36, 0.98], bg: '#0f1424',
+      elevate: true, border: [38, 56, 74, 1], th: 2,
+      content: [{ t: 'box', x: 60, y: 70, w: 239, h: 200, color: [18, 32, 44, 1] }, { t: 'text', v: '강철 투구', x: 179, y: 320, size: 24, align: 'center', color: '#eaf3f2', font: '"Black Han Sans", Jua, sans-serif' }] },
+    // 참고 · Fill 만(Elevate 없음) 24곳 중 하나 — 결과 화면 재화 행 r8 SurfaceRaisedBottom. 레시피판 = face 레이어만(가장자리 그늘) — 질문 ③
+    { name: '결과 재화 행(Fill만)', where: 'MainMenuOverlayViews.CurrencyRow ×4', reps: 'Fill 단독 24곳 대표', w: 300, h: 34, r: 8, fill: '#0e1620', bg: '#0a1017',
+      elevate: false,
+      content: [{ t: 'box', x: 8, y: 6, w: 22, h: 22, color: [245, 232, 89, 0.8] }, { t: 'text', v: '+2,987', x: 290, y: 17, size: 15, align: 'right', color: '#e2e8f0' }] }
+  ]/*END*/;
+
+  // ═════ 현행 = CanvasUi 절차식 재현(텍스처를 C# 과 같은 식으로 만들어 9-slice) ═════
+  //   Fill/Rounded: RoundedFill(r) — (2r+2)² · 네 변 경계 r · ppu 100(1 텍셀 = 1 단위)
+  //   Elevate: 자식 Sheen = RoundedFade(r) · 경계 (L r, B 0, R r, T 0) — **세로는 통째로 늘어난다**(높이 전체 1→0, 감마 1.15) · 색 SurfaceRaisedTop
+  //            자식 TopRim = 위 변에서 1.5 단위 · 좌우 0.6r 물림 · TextBtn α .24(1.5 는 픽셀 행 2줄을 먹는다 — CanvasUi TopInsetHighlight 주석 2026-09-13 실측)
+  function cornerAlpha(x, y, size, radius, inset) {
+    inset = inset || 0;
+    var px = x + 0.5, py = y + 0.5, min = inset, max = size - inset;
+    if (px < min || py < min || px > max || py > max) return 0;
+    var r = Math.max(0, radius - inset);
+    var cx = px < min + r ? min + r : (px > max - r ? max - r : px);
+    var cy = py < min + r ? min + r : (py > max - r ? max - r : py);
+    return clamp01(r - Math.hypot(px - cx, py - cy) + 0.5);
+  }
+  var procCache = {};
+  function procTex(kind, radius, c) {
+    var key = kind + radius + ':' + c.join(','); if (procCache[key]) return procCache[key];
+    var size = radius * 2 + 2, cv = document.createElement('canvas'); cv.width = size; cv.height = size;
+    var x = cv.getContext('2d'), img = x.createImageData(size, size), a = c[3] == null ? 1 : c[3];
+    for (var yy = 0; yy < size; yy++) for (var xx = 0; xx < size; xx++) {
+      // Unity 텍스처 y=0 이 아래 — 캔버스 행 yy 는 위에서 잰다 ⇒ unityY = size-1-yy
+      var uy = size - 1 - yy, al = cornerAlpha(xx, uy, size, radius);
+      if (kind === 'fade') al *= Math.pow(uy / (size - 1), 1.15);
+      var o = (yy * size + xx) * 4; img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = Math.round(al * a * 255);
+    }
+    x.putImageData(img, 0, 0);
+    return (procCache[key] = { canvas: cv, W: size, H: size, bx: radius, by: kind === 'fade' ? 0 : radius });
+  }
+  function procRing(radius, th, c) {
+    var key = 'ring' + radius + ':' + th + ':' + c.join(','); if (procCache[key]) return procCache[key];
+    var size = radius * 2 + 2, cv = document.createElement('canvas'); cv.width = size; cv.height = size;
+    var x = cv.getContext('2d'), img = x.createImageData(size, size), a = c[3] == null ? 1 : c[3], t = Math.max(1, Math.min(th, radius));
+    for (var yy = 0; yy < size; yy++) for (var xx = 0; xx < size; xx++) {
+      var al = clamp01(cornerAlpha(xx, yy, size, radius) - cornerAlpha(xx, yy, size, radius, t));
+      var o = (yy * size + xx) * 4; img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = Math.round(al * a * 255);
+    }
+    x.putImageData(img, 0, 0);
+    return (procCache[key] = { canvas: cv, W: size, H: size, bx: radius, by: radius });
+  }
+  // 9-slice(경계가 변보다 크면 Unity 처럼 비율로 눌러 담는다). bx/by = 텍스처 텍셀 경계 · t2p = 텍셀 → 화면 px
+  function drawSliced(ctx, tex, dx, dy, dw, dh, t2p, bxT, byT) {
+    var W = tex.W, H = tex.H, bx = bxT * t2p, by = byT * t2p;
+    if (bx * 2 > dw) bx = dw / 2; if (by * 2 > dh) by = dh / 2;
+    var sx = [0, bxT, W - bxT, W], sy = [0, byT, H - byT, H], tx = [dx, dx + bx, dx + dw - bx, dx + dw], ty = [dy, dy + by, dy + dh - by, dy + dh];
+    for (var j = 0; j < 3; j++) for (var i = 0; i < 3; i++) {
+      var sw = sx[i + 1] - sx[i], sh = sy[j + 1] - sy[j], tw = tx[i + 1] - tx[i], th = ty[j + 1] - ty[j];
+      if (sw > 0 && sh > 0 && tw > 0 && th > 0) ctx.drawImage(tex.canvas, sx[i], sy[j], sw, sh, tx[i], ty[j], tw, th);
+    }
+  }
+  function drawCurrent(lay, ox, oy, p, s) {
+    var w = p.w * s, h = p.h * s;
+    drawSliced(lay(), procTex('fill', p.r, col(p.fill)), ox, oy, w, h, s, p.r, p.r);
+    if (p.elevate) {
+      var f = procTex('fade', p.r, hex(T.surfRaisedA));
+      drawSliced(lay(), f, ox, oy, w, h, s, p.r, 0);
+      var ctx = lay(), tb = hex(T.textBtn);
+      ctx.fillStyle = 'rgba(' + tb[0] + ',' + tb[1] + ',' + tb[2] + ',0.24)';
+      ctx.fillRect(Math.round(ox + p.r * 0.6 * s), Math.round(oy), Math.round(w - 2 * p.r * 0.6 * s), Math.max(1, Math.round(2 * s)));
+    }
+    drawBorder(lay, ox, oy, p, s);
+  }
+  // 테두리(AddBorder · 호출부가 따로 얹는 링) — 묶음 3 범위 밖이라 현행·레시피 둘 다 같은 절차식 링
+  function drawBorder(lay, ox, oy, p, s) {
+    if (!p.border) return;
+    drawSliced(lay(), procRing(p.r, p.th || 1, col(p.border)), ox, oy, p.w * s, p.h * s, s, p.r, p.r);
+  }
+
+  // ═════ 레시피 = html/ui-recipe-card-bake.js 정본을 잘라 틴트 → 9-slice(게임 순서) ═════
+  //   shadow(옵션 · −PAD 바깥) → face(호출부 Image 자체 · 채움색) → ramp(SurfaceRaisedTop) → sheen(TextBtn) → 결(패널 결 타일 재사용 · Tiled)
+  //   → corner(옵션 · TextBtn) → [호출부 테두리 링 · 내용]
+  var C = window.UiCardRecipe, P = window.UiPanelRecipe, TX = C.TX, PAD = C.PAD, K = 1.25;
+  // 기본값 = owner 확정(2026-10-02): 결 끔 · 림·베벨 켬 · 그림자·모서리 켬 · ×1.25 — 게임(CanvasUi.ElevateCard)이 굽는 한 벌과 같다(목업 = 게임)
+  var OPT = { rim: true, bevel: true, grain: false, shadow: true, corner: true };
+  var RADII = /*RADII*/[14, 11, 8, 7]/*END*/;    // 구워 둘 반경 — 요청 이하 최대값(버튼 RecipeButtonRadius 규칙). 범위 밖 = 현행 폴백
+  function recipeRadius(r) { if (r > RADII[0]) return 0; for (var i = 0; i < RADII.length; i++) if (RADII[i] <= r) return RADII[i]; return 0; }
+  var lcache = {};
+  function layers(radius, opt) {
+    // 옵션(림·베벨)은 굽는 그림을 바꾸므로 키에 넣는다. 목업 전용 — 게임은 owner 가 고른 한 벌만 굽는다.
+    var key = radius + ':' + K + ':' + opt.rim + opt.bevel; if (lcache[key]) return lcache[key];
+    var sh = C.bakeSheet(radius, K, { rim: opt.rim, bevel: opt.bevel }), res = { borders: sh.borders, W: sh.cellW, H: sh.H, layer: {} };
+    C.LAYERS.forEach(function (name, l) {
+      var c = document.createElement('canvas'); c.width = sh.cellW; c.height = sh.H;
+      var cx = c.getContext('2d'), img = cx.createImageData(sh.cellW, sh.H);
+      for (var y = 0; y < sh.H; y++) for (var x = 0; x < sh.cellW; x++) {
+        var si = (y * sh.W + l * sh.cellW + x) * 4, di = (y * sh.cellW + x) * 4;
+        img.data[di] = sh.data[si]; img.data[di + 1] = sh.data[si + 1]; img.data[di + 2] = sh.data[si + 2]; img.data[di + 3] = sh.data[si + 3];
+      }
+      cx.putImageData(img, 0, 0); res.layer[name] = c;
+    });
+    // 램프 — 카드 rect 그대로 · 경계 좌우만(세로 통째 늘림 = 현행 RoundedFade 구조)
+    var rp = C.bakeRamp(radius, K), rc = document.createElement('canvas'); rc.width = rp.W; rc.height = rp.H;
+    var rx = rc.getContext('2d'), ri = rx.createImageData(rp.W, rp.H); ri.data.set(rp.data); rx.putImageData(ri, 0, 0);
+    res.layer.ramp = rc; res.borders.ramp = rp.borderLR;
+    return (lcache[key] = res);
+  }
+  var tcache = {};
+  function tinted(radius, name, c) {
+    var key = radius + ':' + K + ':' + OPT.rim + OPT.bevel + ':' + name + ':' + c.join(','); if (tcache[key]) return tcache[key];
+    var L = layers(radius, OPT), src = L.layer[name], cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height;
+    var x = cv.getContext('2d'); x.drawImage(src, 0, 0);
+    var img = x.getImageData(0, 0, cv.width, cv.height), a = c[3] == null ? 1 : c[3];
+    for (var i = 0; i < img.data.length; i += 4) { img.data[i] = img.data[i] * c[0] / 255; img.data[i + 1] = img.data[i + 1] * c[1] / 255; img.data[i + 2] = img.data[i + 2] * c[2] / 255; img.data[i + 3] = img.data[i + 3] * a; }
+    x.putImageData(img, 0, 0);
+    return (tcache[key] = { canvas: cv, W: cv.width, H: cv.height, b: L.borders[name] });
+  }
+  var grainCache = {};
+  function grainTile() {
+    if (grainCache[K]) return grainCache[K];
+    var g = P.bakeGrainTile(K), c = document.createElement('canvas'); c.width = g.W; c.height = g.H;
+    var x = c.getContext('2d'), img = x.createImageData(g.W, g.H), tb = hex(T.textBtn);
+    for (var i = 0; i < g.data.length; i += 4) { img.data[i] = tb[0]; img.data[i + 1] = tb[1]; img.data[i + 2] = tb[2]; img.data[i + 3] = g.data[i + 3]; }
+    x.putImageData(img, 0, 0);
+    return (grainCache[K] = c);
+  }
+  function drawGrain(ctx, ox, oy, p, rr, s) {
+    var tile = grainTile(), inset = C.grainInset(rr) * s, tw = tile.width / P.GRAIN_TX * s, th = tile.height / P.GRAIN_TX * s;
+    var x0 = ox + inset, y0 = oy + inset, x1 = ox + p.w * s - inset, y1 = oy + p.h * s - inset;
+    if (x1 <= x0 || y1 <= y0) return;
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+    for (var y = y0; y < y1; y += th) for (var x = x0; x < x1; x += tw) ctx.drawImage(tile, x, y, tw, th);
+    ctx.restore();
+  }
+  function drawRecipe(lay, ox, oy, p, s) {
+    var rr = recipeRadius(p.r), minSide = Math.min(p.w, p.h);
+    if (!rr || minSide < 2 * rr) { drawCurrent(lay, ox, oy, p, s); return 'fallback'; }
+    var t2p = s / TX, dx = ox - PAD * s, dy = oy - PAD * s, dw = (p.w + 2 * PAD) * s, dh = (p.h + 2 * PAD) * s;
+    function put(name, c) { var t = tinted(rr, name, c); drawSliced(lay(), t, dx, dy, dw, dh, t2p, t.b, t.b); }
+    if (OPT.shadow) put('shadow', [255, 255, 255, 1]);
+    put('face', col(p.fill));
+    if (p.elevate) {
+      var rt = tinted(rr, 'ramp', hex(T.surfRaisedA));
+      drawSliced(lay(), rt, ox, oy, p.w * s, p.h * s, t2p, rt.b, 0);   // 세로 경계 0 — 높이 전체로 한 장(단차 없음)
+      if (OPT.rim || OPT.bevel) put('sheen', hex(T.textBtn));
+      if (OPT.grain) drawGrain(lay(), ox, oy, p, rr, s);
+      var cornerOk = minSide >= 2 * (rr + C.CORNER_RUN);
+      if (OPT.corner && cornerOk) put('corner', [hex(T.textBtn)[0], hex(T.textBtn)[1], hex(T.textBtn)[2], 0.35]);
+    }
+    drawBorder(lay, ox, oy, p, s);
+    return rr === p.r ? 'recipe' : 'recipe r' + rr;
+  }
+
+  // 자리 표시 내용(글자·막대) — 카드가 실제 화면에서 무엇을 담는지 보이게만
+  function content(ctx, ox, oy, p, s) {
+    if (!p.content) return;
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    p.content.forEach(function (c) {
+      if (c.t === 'text') { ctx.fillStyle = c.color || T.textCaption; ctx.font = (c.size * s) + 'px ' + (c.font || '"IBM Plex Sans KR", sans-serif'); ctx.textAlign = c.align || 'left'; ctx.fillText(c.v, ox + c.x * s, oy + c.y * s); ctx.textAlign = 'left'; }
+      else if (c.t === 'box') { ctx.fillStyle = rgba(c.color); ctx.fillRect(ox + c.x * s, oy + c.y * s, c.w * s, c.h * s); }
+    });
+  }
+
+  function makeCard(p, kind, s, opts) {
+    opts = opts || {};
+    var m = PAD + 4, cw = Math.ceil((p.w + 2 * m) * s), ch = Math.ceil((p.h + 2 * m) * s);
+    var cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; cv.className = 'px';
+    cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+    var ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low';
+    var ox = m * s, oy = m * s, layers = [];
+    function lay() { var L = window.LinearComposite.layer(cw, ch); layers.push(L.canvas); return L.ctx; }
+    var path = kind === 'cur' ? (drawCurrent(lay, ox, oy, p, s), 'current') : drawRecipe(lay, ox, oy, p, s);
+    ctx.drawImage(window.LinearComposite.stack(cw, ch, p.bg || T.bg, layers), 0, 0);
+    if (!opts.bare) content(ctx, ox, oy, p, s);
+    cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', (kind === 'cur' ? '현행 ' : '레시피 ') + p.name);
+    cv._path = path; cv._ox = ox; cv._oy = oy;
+    return cv;
+  }
+  // 카드 안쪽(가장자리 4 단위 안) 평균 밝기 — 내용 없이 그린 판으로 잰다
+  //   반환 { mean, tex } — tex = 가로 이웃 픽셀 밝기 |차| 평균(결이 눈에 보이는 정도 · 세로 램프는 가로 차에 안 잡힌다)
+  function meanInner(p, kind) {
+    var cv = makeCard(p, kind, 1, { bare: true }), x = cv.getContext('2d');
+    var x0 = Math.round(cv._ox + 4), y0 = Math.round(cv._oy + 4), w = p.w - 8, h = p.h - 8;
+    if (w <= 0 || h <= 0) return { mean: NaN, tex: NaN };
+    var d = x.getImageData(x0, y0, w, h).data, sum = 0, tsum = 0, tn = 0;
+    for (var yy = 0; yy < h; yy++) for (var xx = 0; xx < w; xx++) {
+      var i = (yy * w + xx) * 4, l = (d[i] + d[i + 1] + d[i + 2]) / 3; sum += l;
+      if (xx > 0) { tsum += Math.abs(l - (d[i - 4] + d[i - 3] + d[i - 2]) / 3); tn++; }
+    }
+    return { mean: sum / (w * h), tex: tsum / Math.max(1, tn) };
+  }
+  function fig(cv, cap) { var f = document.createElement('figure'), c = document.createElement('figcaption'); c.textContent = cap; f.appendChild(cv); f.appendChild(c); return f; }
+
+  var SCALE = 1;
+  function build() {
+    var st = document.getElementById('stage'); st.innerHTML = '';
+    CARDS.forEach(function (p) {
+      var pr = document.createElement('div'); pr.className = 'pair';
+      var t = document.createElement('div'); t.className = 'ttl'; t.innerHTML = p.name + ' <span>· ' + p.where + ' · ' + p.w + '×' + p.h + ' · r' + p.r + (p.elevate ? ' · Elevate' : ' · Fill만') + (p.reps ? ' · ' + p.reps : '') + '</span>';
+      pr.appendChild(t);
+      var a = makeCard(p, 'cur', SCALE), b = makeCard(p, 'rec', SCALE);
+      pr.appendChild(fig(a, '현행'));
+      pr.appendChild(fig(b, '레시피' + (b._path === 'fallback' ? ' — 폴백(현행 그대로)' : b._path !== 'recipe' ? ' — 구운 반경 ' + b._path.slice(8) + ' 사용' : '')));
+      st.appendChild(pr);
+    });
+    var z = document.getElementById('zoom-row'); z.innerHTML = '';
+    CARDS.filter(function (p) { return p.zoom; }).forEach(function (p) {
+      ['cur', 'rec'].forEach(function (k) {
+        var src = makeCard(p, k, 1, { bare: true }), Z = 4, cw = 40, chh = 40, m = PAD + 4 - 4;
+        var c = document.createElement('canvas'); c.width = cw * Z; c.height = chh * Z; c.className = 'px'; c.style.width = (cw * Z) + 'px'; c.style.height = (chh * Z) + 'px';
+        var x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(src, m, m, cw, chh, 0, 0, cw * Z, chh * Z);
+        c.setAttribute('role', 'img'); c.setAttribute('aria-label', p.name + (k === 'cur' ? ' 현행' : ' 레시피') + ' 모서리 확대');
+        z.appendChild(fig(c, p.name + ' · ' + (k === 'cur' ? '현행' : '레시피')));
+      });
+    });
+    buildSheet();
+    buildMeter();
+  }
+  function buildSheet() {
+    var sheet = document.getElementById('sheet'); sheet.innerHTML = '';
+    RADII.forEach(function (rr) {
+      var L = layers(rr, OPT);
+      C.LAYERS.concat(['ramp']).forEach(function (name) {
+        var tex = L.layer[name], Z = 2, b = L.borders[name], c = document.createElement('canvas');
+        c.width = tex.width * Z; c.height = tex.height * Z; c.className = 'px'; c.style.width = (tex.width * Z) + 'px'; c.style.height = (tex.height * Z) + 'px';
+        var x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(tex, 0, 0, tex.width * Z, tex.height * Z);
+        x.strokeStyle = 'rgba(87,209,184,0.55)'; x.setLineDash([4, 4]);
+        [b, tex.width - b].forEach(function (v) { x.beginPath(); x.moveTo(v * Z + 0.5, 0); x.lineTo(v * Z + 0.5, tex.height * Z); x.stroke(); });
+        (name === 'ramp' ? [] : [b, tex.height - b]).forEach(function (v) { x.beginPath(); x.moveTo(0, v * Z + 0.5); x.lineTo(tex.width * Z, v * Z + 0.5); x.stroke(); });
+        c.setAttribute('role', 'img'); c.setAttribute('aria-label', 'card_r' + rr + ' ' + name + ' 레이어');
+        sheet.appendChild(fig(c, 'card_r' + rr + '_' + name));
+      });
+    });
+  }
+  function buildMeter() {
+    var keepK = K, rows = [], ks = [0.5, 1, 1.25, 1.5, 2];
+    var head = '<tr><th>카드</th><th>현행 평균</th>' + ks.map(function (k) { return '<th>레시피 ×' + k + '</th>'; }).join('') +
+      '<th>평균 차 ×1.5−×1.0</th><th>양 끝 ×2−×0.5</th><th>결 대비 현행</th><th>결 대비 ×1.0</th><th>결 대비 ×1.5</th></tr>';
+    var minDiff = Infinity, maxDiff = 0;
+    CARDS.forEach(function (p) {
+      var cur = meanInner(p, 'cur'), vals = ks.map(function (k) { K = k; return meanInner(p, 'rec'); });
+      K = keepK;
+      var diff = vals[3].mean - vals[1].mean, span = vals[4].mean - vals[0].mean;
+      if (p.elevate) { if (diff > maxDiff) maxDiff = diff; if (diff < minDiff) minDiff = diff; }
+      rows.push('<tr><td>' + p.name + '</td><td>' + cur.mean.toFixed(1) + '</td>' + vals.map(function (v) { return '<td>' + v.mean.toFixed(1) + '</td>'; }).join('') +
+        '<td>' + (diff >= 0 ? '+' : '') + diff.toFixed(1) + '</td><td>' + (span >= 0 ? '+' : '') + span.toFixed(1) + '</td><td>' + cur.tex.toFixed(2) + '</td><td>' + vals[1].tex.toFixed(2) + '</td><td>' + vals[3].tex.toFixed(2) + '</td></tr>');
+    });
+    K = keepK;
+    document.getElementById('mtable').innerHTML = head + rows.join('');
+    document.getElementById('meter').innerHTML = '질감 세기 ×1.0 → ×1.5 에서 융기 카드 안쪽 평균 밝기가 <b>' + (minDiff >= 0 ? '+' : '') + minDiff.toFixed(1) + ' ~ +' + maxDiff.toFixed(1) + '/255</b> 바뀝니다(아래 표). 밝은 채움(선택된 청록 행)은 램프가 어두운 색이라 세기를 올리면 오히려 조금 어두워집니다 — 현행 Elevate 와 같은 성질입니다.';
+    window.__measure = { rows: rows.length, minDiff: minDiff, maxDiff: maxDiff };
+  }
+
+  document.querySelectorAll('.seg').forEach(function (b) {
+    b.addEventListener('click', function () {
+      SCALE = parseFloat(b.dataset.scale);
+      document.querySelectorAll('.seg').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      build();
+    });
+  });
+  var kIn = document.getElementById('k'), kOut = document.getElementById('k-out');
+  kIn.addEventListener('input', function () { K = parseFloat(kIn.value); kOut.textContent = '×' + K; build(); });
+  ['rim', 'bevel', 'grain', 'shadow', 'corner'].forEach(function (k) {
+    document.getElementById('opt-' + k).addEventListener('change', function (e) { OPT[k] = e.target.checked; build(); });
+  });
+  // ?k=1.5&shadow=1 … — 헤드리스 렌더 검증용
+  var q = new URLSearchParams(location.search);
+  if (q.has('k')) { K = parseFloat(q.get('k')); kIn.value = K; kOut.textContent = '×' + K; }
+  ['rim', 'bevel', 'grain', 'shadow', 'corner'].forEach(function (k) { if (q.has(k)) { OPT[k] = q.get(k) === '1'; document.getElementById('opt-' + k).checked = OPT[k]; } });
+
+  // ?probe=1 — 엔진 대조용: 맵 선택 카드(내용 없이 ×1)의 가운데 열 표본(카드 로컬 y 0,13,…,169) + 안쪽 8px 들인 평균
+  function probe() {
+    var p = CARDS.filter(function (c) { return c.name === '맵 선택 카드'; })[0], out = {};
+    ['cur', 'rec'].forEach(function (k) {
+      var cv = makeCard(p, k, 1, { bare: true }), x = cv.getContext('2d'), ox = Math.round(cv._ox), oy = Math.round(cv._oy), col = {};
+      for (var y = 0; y <= 169; y += 13) { var d = x.getImageData(ox + Math.floor(p.w / 2), oy + y, 1, 1).data; col[y] = [d[0], d[1], d[2]]; }
+      var w = p.w - 16, h = p.h - 16, dd = x.getImageData(ox + 8, oy + 8, w, h).data, s = 0;
+      for (var i = 0; i < dd.length; i += 4) s += (dd[i] + dd[i + 1] + dd[i + 2]) / 3;
+      var bgp = x.getImageData(2, 2, 1, 1).data;
+      out[k] = { path: cv._path, column: col, innerMean: +(s / (w * h)).toFixed(2), bgPixel: [bgp[0], bgp[1], bgp[2]] };
+    });
+    // 단차 지표 — 카드 안쪽(좌우 8 · 위아래 3 들임) 행 평균 밝기의 인접 행 차 최대값(맵 카드 · 뽑기 카드, 현행/레시피)
+    out.step = {};
+    CARDS.filter(function (c) { return c.name === '맵 선택 카드' || c.name === '장비 뽑기 카드'; }).forEach(function (c) {
+      out.step[c.name] = {};
+      ['cur', 'rec'].forEach(function (k) {
+        var cv = makeCard(c, k, 1, { bare: true }), x = cv.getContext('2d'), ox = Math.round(cv._ox), oy = Math.round(cv._oy);
+        var w = c.w - 16, d = x.getImageData(ox + 8, oy + 3, w, c.h - 6).data, prev = null, mx = 0, at = -1, mb = 0, atb = -1, top = c.r + 2;
+        for (var yy = 0; yy < c.h - 6; yy++) {
+          var s2 = 0; for (var xx = 0; xx < w; xx++) { var i = (yy * w + xx) * 4; s2 += (d[i] + d[i + 1] + d[i + 2]) / 3; }
+          s2 /= w;
+          if (prev != null) {
+            var dd2 = Math.abs(s2 - prev);
+            if (dd2 > mx) { mx = dd2; at = yy + 3; }
+            if (yy + 3 > top && dd2 > mb) { mb = dd2; atb = yy + 3; }   // 위 칸(반경 + 2) 아래 — 상단 림·빛 띠(의도된 하이라이트) 제외
+          }
+          prev = s2;
+        }
+        out.step[c.name][k] = { maxAdjRowDiff: +mx.toFixed(2), atLocalY: at, belowTopCell: +mb.toFixed(2), belowTopAtY: atb };
+      });
+    });
+    // 안쪽 4 단위 평균(meanInner) — 엔진 캡처와 같은 지표로 대조할 두 카드
+    out.inner4 = {};
+    CARDS.filter(function (c) { return c.name === '맵 선택 카드' || c.name === '무기 목록 행'; }).forEach(function (c) {
+      out.inner4[c.name] = { cur: +meanInner(c, 'cur').mean.toFixed(2), rec: +meanInner(c, 'rec').mean.toFixed(2) };
+    });
+    out.K = K; out.opt = OPT;
+    var pre = document.createElement('pre'); pre.id = 'probe'; pre.textContent = JSON.stringify(out); document.body.appendChild(pre);
+  }
+  if (q.get('probe') === '1') { var _b = build; build = function () { _b(); probe(); }; }
+
+  var ready = document.fonts && document.fonts.load ? Promise.all([document.fonts.load('20px "Black Han Sans"'), document.fonts.load('14px "IBM Plex Sans KR"'), document.fonts.load('16px Jua')]) : Promise.resolve();
+  Promise.race([ready, new Promise(function (r) { setTimeout(r, 1500); })]).then(build, build);
+})();
+</script>

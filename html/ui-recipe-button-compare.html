@@ -1,0 +1,396 @@
+<title>메뉴 버튼 레시피 비교</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=IBM+Plex+Sans+KR:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 레이아웃: 게임 메뉴 바탕 위에 「현행 / 레시피」를 같은 크기·같은 축척으로 겹쳐 놓고, 아래로 상태 5종 · 확대 · 실제 텍스처 · 포팅 메모.
+   색은 전부 게임 토큰(ui-prototype.html :root · UiTheme.asset) — 이 목업이 새로 만든 색은 0 이다. */
+:root {
+  color-scheme: dark;
+  --bg-deep: #070c11; --bg: #0b1218; --bg-rise: #12202c;
+  --surface-card: #0a1017; --surface-a: #16202c; --surface-b: #0e1620;
+  --btn-border: #26384a; --teal: #57d1b8; --text: #e2e8f0; --text-btn: #c9d6e2; --text-caption: #b9c6d3;
+  --muted: #7f8fa0; --rule: #1b2733;
+  --font-ui: "Jua", "IBM Plex Sans KR", sans-serif;
+  --font-body: "IBM Plex Sans KR", "Malgun Gothic", sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, monospace;
+}
+html, body { background: var(--bg-deep); color: var(--text); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--font-ui); font-weight: 400; text-wrap: balance; margin: 0; letter-spacing: .01em; }
+h1 { font-size: 30px; color: var(--text); }
+h2 { font-size: 21px; color: var(--text); }
+p { margin: 0; max-width: 68ch; color: var(--text-caption); }
+.lede { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+section { display: grid; gap: 14px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.controls span { font-size: 13px; color: var(--muted); margin-right: 4px; }
+.seg { font: 500 13px var(--font-mono); color: var(--text-btn); background: var(--surface-b); border: 1px solid var(--btn-border);
+  padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.seg[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
+.seg:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.stage { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg) !important;
+  background: radial-gradient(ellipse at 40% 35%, var(--bg-rise), var(--bg) 55%, var(--bg-deep)); }
+.stage-inner { display: grid; grid-template-columns: max-content; gap: 28px; padding: 26px; width: max-content; }
+.col { display: grid; gap: 10px; align-content: start; }
+.col-h { font-family: var(--font-mono); font-size: 12px; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
+.col-h b { color: var(--text); font-weight: 500; }
+.stack { display: grid; justify-items: start; }
+.smalls { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+canvas.px { image-rendering: pixelated; display: block; }
+canvas.btn { cursor: pointer; }
+.hint { font-size: 13px; color: var(--muted); }
+.matrix { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+table { border-collapse: collapse; width: max-content; }
+th, td { padding: 12px 16px; border-bottom: 1px solid var(--rule); vertical-align: middle; text-align: left; }
+th { font: 500 12px var(--font-mono); letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+td.state { font-family: var(--font-ui); font-size: 16px; color: var(--text); white-space: nowrap; }
+td.state small { display: block; font: 400 11px var(--font-mono); color: var(--muted); letter-spacing: .04em; }
+tr:last-child td { border-bottom: 0; }
+.cellpair { display: flex; gap: 12px; align-items: center; }
+.sheet { display: flex; flex-wrap: wrap; gap: 22px; padding: 20px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface-card); }
+.sheet figure { margin: 0; display: grid; gap: 6px; justify-items: center; }
+.sheet figcaption { font: 400 12px var(--font-mono); color: var(--muted); text-align: center; }
+.checker { background-color: #0c1218; background-image: linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%), linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%);
+  background-size: 12px 12px; background-position: 0 0, 6px 6px; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.note { border-top: 2px solid var(--btn-border); padding-top: 12px; display: grid; gap: 6px; min-width: 0; }
+.note h3 { margin: 0; font: 600 15px var(--font-body); color: var(--text); }
+.note p, .note li { font-size: 14px; color: var(--text-caption); }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+code { font-family: var(--font-mono); font-size: .9em; color: var(--text-btn); background: var(--surface-b); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.ask { border: 1px solid var(--teal); border-radius: 12px; padding: 18px 20px; display: grid; gap: 8px; background: color-mix(in srgb, var(--teal) 6%, var(--bg)); }
+.ask h2 { color: var(--teal); }
+.ask ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; color: var(--text-caption); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="lede">
+    <div class="eyebrow">UI 레시피 · 샘플 1 · 기본 버튼 <code>CanvasUi.NewButton</code> (호출 55곳)</div>
+    <h1>메뉴 버튼 · 현행 vs 레시피</h1>
+    <p>위는 지금 게임이 코드로 그리는 버튼(단색 채움 + 1px 테두리 + 상단 1px 림)이고, 아래는 v3 이펙트처럼 <b>레시피를 임포트할 때 굽는 텍스처</b>로 그린 버튼입니다.
+      두 줄 모두 같은 크기, 같은 라벨, 같은 색 토큰을 씁니다. 다른 것은 버튼 바탕 그림 하나뿐입니다. 버튼에 마우스를 올리거나 누르고, 클릭해서 포커스를 옮겨 보세요.</p>
+  </header>
+
+  <section aria-labelledby="s1">
+    <h2 id="s1">메인 메뉴에 놓았을 때</h2>
+    <div class="controls" role="group" aria-label="화면 축척">
+      <span>화면 축척</span>
+      <button class="seg" id="sc-1" data-scale="1" aria-pressed="true">1920×1080 · ×1</button>
+      <button class="seg" id="sc-664" data-scale="0.664" aria-pressed="false">1275×717 · ×0.664</button>
+      <button class="seg" id="sc-5" data-scale="0.5" aria-pressed="false">960×540 · ×0.5</button>
+    </div>
+    <div class="controls">
+      <label for="k" style="font-size:13px;color:var(--muted)">레시피 질감 세기</label>
+      <input id="k" type="range" min="0.5" max="2" step="0.25" value="1.25" style="accent-color:var(--teal)">
+      <output id="k-out" for="k" style="font:500 13px var(--font-mono);color:var(--teal)">×1.25</output>
+    </div>
+    <div class="stage"><div class="stage-inner">
+      <div class="col">
+        <div class="col-h"><b>현행</b> · CanvasUi 코드 그리기</div>
+        <div class="stack" id="cur-stack"></div>
+        <div class="smalls" id="cur-smalls"></div>
+      </div>
+      <div class="col">
+        <div class="col-h"><b>레시피</b> · 임포트 시 굽기</div>
+        <div class="stack" id="rec-stack"></div>
+        <div class="smalls" id="rec-smalls"></div>
+      </div>
+    </div></div>
+    <p class="hint">게임과 같은 <b>리니어 블렌딩</b>으로 합성했습니다(게임은 Linear 색공간). 한 칸이 게임 픽셀 하나입니다(확대해도 흐려지지 않게 nearest 로 그렸습니다). ×0.664 는 2026-09-13 owner 가 「PLAY 버튼 좌우가 잘린다」고 신고한 해상도입니다. 브라우저의 축소 필터는 Unity(밉맵 없음 · bilinear)보다 부드러워서, 실제 모습은 포팅 후 게임 캡처로 다시 확인합니다.</p>
+  </section>
+
+  <section aria-labelledby="s2">
+    <h2 id="s2">상태 5종 · 왼쪽 위 모서리 4배 확대</h2>
+    <div class="matrix"><table>
+      <thead><tr><th>상태</th><th>현행 · 맵 화살표 54×34 · AUTO 96×28</th><th>레시피 · 같은 크기</th><th>현행 · 모서리 ×4</th><th>레시피 · 모서리 ×4</th></tr></thead>
+      <tbody id="matrix"></tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="s3">
+    <h2 id="s3">레시피가 실제로 굽는 텍스처</h2>
+    <p>반경 11 기준 레이어 5장(그림자 · 테두리 · 면 · 광택 · 포커스 발광)입니다. 전부 흰색이나 회색 바탕이고, 색은 게임이 지금처럼 입힙니다. 그래서 포커스 청록 테두리, 레벨 칩 금색, 런 종료 빨강 같은 기존 색 지정이 그대로 동작합니다.
+      텍스처 1칸은 게임 0.5 단위(×2 해상도)이고, 점선이 9-slice 경계입니다. 가운데 칸만 늘어나고 모서리는 늘어나지 않습니다.
+      결은 가로로 흐르는 브러시 질감(fbm)이라 가운데 칸을 가로로 늘려도 이음매가 생기지 않습니다. 바깥 4단위는 자리 그림자와 포커스 발광이 차지하는 여백입니다.</p>
+    <div class="sheet checker" id="sheet"></div>
+  </section>
+
+  <section aria-labelledby="s4">
+    <h2 id="s4">포팅하면 바뀌는 것</h2>
+    <div class="notes">
+      <div class="note"><h3>그리는 방식</h3>
+        <ul><li>상태 전환은 지금처럼 <code>ColorTint</code> 입니다. 바뀌는 것은 색을 입힐 바탕 그림뿐입니다(평평한 흰 둥근 사각형 → 구운 면 · 테두리 · 광택).</li>
+          <li>호출부가 테두리 색이나 ColorTint 를 직접 바꾸는 곳(포커스 링 · 레벨 칩 · 연구소 탭 · 런 종료)은 그대로 동작합니다.</li>
+          <li>호출부 55곳의 시그니처는 그대로 둡니다. 킷 함수 안쪽만 바뀝니다.</li></ul></div>
+      <div class="note"><h3>1px 테두리가 사라지던 문제</h3>
+        <p>지금은 Fill 을 1px 안으로 들여서 생긴 틈이 테두리로 보이는 구조라, 축척이 1보다 작으면 변마다 래스터에서 통째로 빠집니다(<code>BorderInset</code> 주석 참조). 텍스처에 구운 테두리는 축소돼도 필터로 옅어질 뿐 빠지지 않습니다. 위 ×0.664 를 비교해 보세요.</p></div>
+      <div class="note"><h3>크기 변형</h3>
+        <p>9-slice 는 위아래 경계 합이 버튼 높이를 넘으면 모서리가 눌립니다. 그래서 반경 11 · 8 · 6 세 벌을 굽고, 높이 20짜리 「닫기」는 6을, AUTO 28은 8을 씁니다. 지금의 <code>PillRadius</code> 규칙과 같습니다.</p></div>
+      <div class="note"><h3>그대로 두는 것</h3>
+        <ul><li>색 토큰 신규 0. 정본 <code>ui-prototype.html</code> 토큰만 씁니다.</li>
+          <li>라벨 폰트(주아), 크기, 여백, 포커스 순서, 클릭음은 그대로입니다.</li>
+          <li>노이즈는 v3 와 같은 mulberry32 + fbm 이고 시드는 레시피 이름입니다. 몇 번을 구워도 같은 픽셀이 나옵니다.</li></ul></div>
+    </div>
+  </section>
+
+  <section class="ask" aria-labelledby="s5">
+    <h2 id="s5">봐주실 것</h2>
+    <ol>
+      <li>질감 세기: 위 슬라이더로 골라 주세요(지금 ×1.25). 숫자 하나로 알려 주시면 그 값으로 굽습니다.</li>
+      <li>포커스 표시: 지금은 버튼 전체를 짙은 청록으로 칠합니다. 레시피는 그 채움을 유지하고 청록 테두리와 바깥 발광을 더했습니다.</li>
+      <li>괜찮으면 이 문법으로 다음은 패널 프레임(<code>Panel</code> 25곳), 그다음은 융기 카드입니다.</li>
+    </ol>
+  </section>
+</div>
+
+<script src="ui-recipe-button-bake.js"></script>
+<script src="ui-recipe-linear-composite.js"></script>
+<script>
+(function () {
+  'use strict';
+  // ── 게임 토큰(UiTheme.asset · ui-prototype.html :root). 신규 색 0.
+  var T = {
+    surfA: '#16202c',      // SurfaceRaisedTopColor  = --surface-raised-a  (normalColor)
+    surfB: '#0e1620',      // SurfaceRaisedBottomColor = --surface-raised-b (disabledColor)
+    hovA: '#1d2836',       // ButtonHoverFillTopColor (highlightedColor)
+    hovB: '#131d28',       // ButtonHoverFillBottomColor (pressedColor)
+    border: '#26384a',     // ButtonBorderColor = --btn-border
+    textBtn: '#c9d6e2',    // TextBtnColor = --text-btn
+    teal: '#57d1b8',       // --teal
+    focus: '#0d261f',      // MenuFocusFillColor (0.05, 0.15, 0.12)
+    deep: '#070c11'        // --bg-deep
+  };
+  var STATES = [
+    { key: 'normal', name: '기본', unity: 'normal' },
+    { key: 'hover', name: '호버', unity: 'highlighted' },
+    { key: 'pressed', name: '눌림', unity: 'pressed' },
+    { key: 'focus', name: '포커스', unity: 'selected' },
+    { key: 'disabled', name: '비활성', unity: 'disabled' }
+  ];
+
+  function hex(h) { h = h.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
+  function mix(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function css(c, a) { return 'rgba(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ',' + (a == null ? 1 : a) + ')'; }
+
+  // ── 레시피 굽기 = html/ui-recipe-button-bake.js(정본 · C# UiButtonDrawer 와 1:1). 여기서는 시트를 잘라 레이어별 캔버스로만 만든다.
+  var R = window.UiButtonRecipe, TX = R.TX, PAD = R.PAD, K = 1.25;   // K = 질감 세기(owner 확정 ×1.25)
+  var sheetCache = {};
+  function layers(radius) {
+    var key = radius + ':' + K;
+    if (sheetCache[key]) return sheetCache[key];
+    var sh = R.bakeSheet(radius, K), res = { border: sh.border, W: sh.cellW, H: sh.H, layer: {} };
+    R.LAYERS.forEach(function (name, l) {
+      var c = document.createElement('canvas'); c.width = sh.cellW; c.height = sh.H;
+      var ctx = c.getContext('2d'), img = ctx.createImageData(sh.cellW, sh.H);
+      for (var y = 0; y < sh.H; y++) for (var x = 0; x < sh.cellW; x++) {
+        var si = (y * sh.W + l * sh.cellW + x) * 4, di = (y * sh.cellW + x) * 4;
+        img.data[di] = sh.data[si]; img.data[di + 1] = sh.data[si + 1]; img.data[di + 2] = sh.data[si + 2]; img.data[di + 3] = sh.data[si + 3];
+      }
+      ctx.putImageData(img, 0, 0);
+      res.layer[name] = c;
+    });
+    sheetCache[key] = res;
+    return res;
+  }
+  // Image.color 곱하기(Unity: 텍스처 RGB × 색, 알파 × 색 알파)
+  var tintCache = {};
+  function tinted(radius, name, colHex) {
+    var key = radius + ':' + K + ':' + name + ':' + colHex;
+    if (tintCache[key]) return tintCache[key];
+    var src = layers(radius).layer[name], c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+    var ctx = c.getContext('2d'); ctx.drawImage(src, 0, 0);
+    var img = ctx.getImageData(0, 0, c.width, c.height), t = hex(colHex);
+    for (var i = 0; i < img.data.length; i += 4) { img.data[i] = img.data[i] * t[0] / 255; img.data[i + 1] = img.data[i + 1] * t[1] / 255; img.data[i + 2] = img.data[i + 2] * t[2] / 255; }
+    ctx.putImageData(img, 0, 0);
+    var res = { canvas: c, border: layers(radius).border, W: c.width, H: c.height };
+    tintCache[key] = res;
+    return res;
+  }
+
+  // Unity Image.Type.Sliced 재현 — 경계 합이 목적 크기를 넘으면 경계를 비례로 줄인다(그때 모서리가 눌린다)
+  function drawSliced(ctx, tex, dx, dy, dw, dh, texelToPx) {
+    var b = tex.border, W = tex.W, H = tex.H;
+    var bx = b * texelToPx, by = b * texelToPx;
+    if (bx * 2 > dw) bx = dw / 2;
+    if (by * 2 > dh) by = dh / 2;
+    var sx = [0, b, W - b, W], sy = [0, b, H - b, H];
+    var tx = [dx, dx + bx, dx + dw - bx, dx + dw], ty = [dy, dy + by, dy + dh - by, dy + dh];
+    for (var j = 0; j < 3; j++) for (var i = 0; i < 3; i++) {
+      var sw = sx[i + 1] - sx[i], shh = sy[j + 1] - sy[j], tw = tx[i + 1] - tx[i], th = ty[j + 1] - ty[j];
+      if (sw > 0 && shh > 0 && tw > 0 && th > 0) ctx.drawImage(tex.canvas, sx[i], sy[j], sw, shh, tx[i], ty[j], tw, th);
+    }
+  }
+
+  // ── 현행 재현: CanvasUi.NewButton = 둥근 테두리 Image(ButtonBorderColor) + BorderInset 만큼 들인 Fill(ColorTint 단색)
+  //    + TopInsetHighlight(TextBtn α0.24, 좌우 radius*0.6 물러남). BorderInset = 최소 1 디바이스 픽셀.
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  var BG = '#0b1218';   // 합성 바탕 = --bg(메뉴 바탕 · 레시피 보정 기준 REF_BG 와 같은 색)
+  var CUR_FILL = { normal: T.surfA, hover: T.hovA, pressed: T.hovB, focus: T.focus, disabled: T.surfB };
+  // lay() = 새 투명 레이어(Unity 의 Image 하나). 레이어끼리는 LinearComposite 가 게임처럼 리니어로 섞는다.
+  function drawCurrent(lay, ox, oy, w, h, radius, state, s) {
+    var inset = Math.max(1, 1 / s);               // 가상 단위
+    var ctx = lay(); ctx.fillStyle = T.border; roundRect(ctx, ox, oy, w * s, h * s, radius * s); ctx.fill();
+    var ir = Math.max(2, radius - Math.round(inset));
+    ctx = lay(); ctx.fillStyle = CUR_FILL[state];
+    roundRect(ctx, ox + inset * s, oy + inset * s, (w - 2 * inset) * s, (h - 2 * inset) * s, ir * s); ctx.fill();
+    if (state !== 'focus') {                       // SyncFocusRing 이 포커스면 TopRim 을 숨긴다
+      ctx = lay(); ctx.fillStyle = css(hex(T.textBtn), 0.24);
+      ctx.fillRect(ox + ir * 0.6 * s, oy + inset * s, (w - 2 * ir * 0.6) * s, inset * s);
+    }
+  }
+  // 게임과 같은 순서로 합성: shadow(흰) → ring(테두리색) → face(ColorTint 상태색) → sheen(TextBtn) → glow(포커스일 때만 · MenuCursor)
+  var REC_TINT = { normal: T.surfA, hover: T.hovA, pressed: T.hovB, focus: T.focus, disabled: T.surfB };
+  function drawRecipe(lay, ox, oy, w, h, radius, state, s) {
+    var texelToPx = s / TX, dx = ox - PAD * s, dy = oy - PAD * s, dw = (w + 2 * PAD) * s, dh = (h + 2 * PAD) * s;
+    var ring = state === 'focus' ? T.teal : T.border;
+    var seq = [['shadow', '#ffffff'], ['ring', ring], ['face', REC_TINT[state]], ['sheen', T.textBtn]];
+    if (state === 'focus') seq.push(['glow', T.teal]);
+    seq.forEach(function (p) { drawSliced(lay(), tinted(radius, p[0], p[1]), dx, dy, dw, dh, texelToPx); });
+  }
+
+  function label(ctx, text, ox, oy, w, h, s, size, align, padL) {
+    ctx.fillStyle = T.textBtn;
+    ctx.font = (size * s) + 'px Jua, "IBM Plex Sans KR", sans-serif';
+    ctx.textBaseline = 'middle';
+    if (align === 'left') { ctx.textAlign = 'left'; ctx.fillText(text, ox + padL * s, oy + h * s / 2 + 1 * s); }
+    else { ctx.textAlign = 'center'; ctx.fillText(text, ox + w * s / 2, oy + h * s / 2 + 1 * s); }
+  }
+
+
+  // 버튼 하나 = 캔버스 하나(게임 픽셀 1:1, 여백 PAD 포함)
+  function makeButton(spec, kind, s, stateOverride) {
+    var m = PAD;
+    var cw = Math.ceil((spec.w + 2 * m) * s), ch = Math.ceil((spec.h + 2 * m) * s);
+    var cv = document.createElement('canvas');
+    cv.width = cw; cv.height = ch; cv.className = 'px' + (stateOverride ? '' : ' btn');
+    cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+    var st = { state: stateOverride || (spec.disabled ? 'disabled' : 'normal'), hover: false, down: false };
+    function paint() {
+      var ctx = cv.getContext('2d');
+      var ox = m * s, oy = m * s, layers = [];
+      function lay() { var L = window.LinearComposite.layer(cw, ch); layers.push(L.canvas); return L.ctx; }
+      if (kind === 'cur') drawCurrent(lay, ox, oy, spec.w, spec.h, spec.r, st.state, s);
+      else drawRecipe(lay, ox, oy, spec.w, spec.h, spec.r, st.state, s);
+      ctx.drawImage(window.LinearComposite.stack(cw, ch, BG, layers), 0, 0);
+      label(ctx, spec.label, ox, oy, spec.w, spec.h, s, spec.font, spec.align, spec.padL || 0);
+    }
+    cv.setAttribute('role', 'img');
+    cv.setAttribute('aria-label', (kind === 'cur' ? '현행 ' : '레시피 ') + spec.label + ' 버튼');
+    if (!stateOverride && !spec.disabled) {
+      function resolve() {
+        st.state = st.down ? 'pressed' : st.hover ? 'hover' : (FOCUSED === cv.dataset.id ? 'focus' : 'normal');
+        paint();
+      }
+      cv.addEventListener('pointerenter', function () { st.hover = true; resolve(); });
+      cv.addEventListener('pointerleave', function () { st.hover = false; st.down = false; resolve(); });
+      cv.addEventListener('pointerdown', function () { st.down = true; resolve(); });
+      cv.addEventListener('pointerup', function () { st.down = false; FOCUSED = cv.dataset.id; refreshAll(); });
+      cv._resolve = resolve;
+    }
+    paint();
+    return cv;
+  }
+
+  var FOCUSED = 'row0';
+  var LIVE = [];
+  function refreshAll() { LIVE.forEach(function (c) { if (c._resolve) c._resolve(); }); }
+
+  var MENU = ['PLAY', '연구소', '뽑기', '도전과제', '설정'].map(function (t, i) {
+    return { id: 'row' + i, label: t, w: 634, h: 92, r: 11, font: 29, align: 'left', padL: 51 };
+  });
+  var SMALL = [
+    { id: 'prev', label: '◀', w: 54, h: 34, r: 11, font: 18, align: 'center' },
+    { id: 'next', label: '▶', w: 54, h: 34, r: 11, font: 18, align: 'center' },
+    { id: 'auto', label: 'AUTO', w: 96, h: 28, r: 8, font: 15, align: 'center' },
+    { id: 'close', label: '닫기', w: 44, h: 20, r: 6, font: 12, align: 'center' },
+    { id: 'off', label: '잠김', w: 96, h: 34, r: 11, font: 15, align: 'center', disabled: true }
+  ];
+  var ROW_GAP = 14;  // 표시용 간격(게임은 MenuButtonRowGap)
+
+  function buildStage(s) {
+    LIVE = [];
+    [['cur', 'cur'], ['rec', 'rec']].forEach(function (p) {
+      var stack = document.getElementById(p[0] + '-stack'), smalls = document.getElementById(p[0] + '-smalls');
+      stack.innerHTML = ''; smalls.innerHTML = '';
+      stack.style.gap = Math.max(0, ROW_GAP * s - 2 * PAD * s) + 'px';
+      MENU.forEach(function (spec) { var c = makeButton(spec, p[1], s); c.dataset.id = spec.id; stack.appendChild(c); LIVE.push(c); });
+      SMALL.forEach(function (spec) { var c = makeButton(spec, p[1], s); c.dataset.id = spec.id; smalls.appendChild(c); LIVE.push(c); });
+    });
+    refreshAll();
+  }
+
+  function buildMatrix() {
+    var tb = document.getElementById('matrix');
+    var arrow = SMALL[0], auto = SMALL[2];
+    var corner = { label: '', w: 634, h: 92, r: 11, font: 29, align: 'left' };
+    STATES.forEach(function (S) {
+      var tr = document.createElement('tr');
+      var th = document.createElement('td'); th.className = 'state';
+      th.innerHTML = S.name + '<small>' + S.unity + '</small>';
+      tr.appendChild(th);
+      ['cur', 'rec'].forEach(function (k) {
+        var td = document.createElement('td'), wrap = document.createElement('div'); wrap.className = 'cellpair';
+        wrap.appendChild(makeButton(arrow, k, 1, S.key));
+        wrap.appendChild(makeButton(auto, k, 1, S.key));
+        td.appendChild(wrap); tr.appendChild(td);
+      });
+      ['cur', 'rec'].forEach(function (k) {
+        var td = document.createElement('td');
+        var src = makeButton(corner, k, 1, S.key);
+        var Z = 4, cw = 44, chh = 34;
+        var z = document.createElement('canvas'); z.width = cw * Z; z.height = chh * Z; z.className = 'px';
+        z.style.width = (cw * Z) + 'px'; z.style.height = (chh * Z) + 'px';
+        var zc = z.getContext('2d'); zc.imageSmoothingEnabled = false;
+        zc.drawImage(src, 0, 0, cw, chh, 0, 0, cw * Z, chh * Z);
+        z.setAttribute('role', 'img'); z.setAttribute('aria-label', (k === 'cur' ? '현행' : '레시피') + ' ' + S.name + ' 모서리 확대');
+        td.appendChild(z); tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+  }
+
+  function buildSheet() {
+    var host = document.getElementById('sheet'), L = layers(11), Z = 4;
+    R.LAYERS.forEach(function (name) {
+      var tex = L.layer[name];
+      var c = document.createElement('canvas'); c.width = tex.width * Z; c.height = tex.height * Z; c.className = 'px';
+      c.style.width = (tex.width * Z) + 'px'; c.style.height = (tex.height * Z) + 'px';
+      var x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+      x.drawImage(tex, 0, 0, tex.width * Z, tex.height * Z);
+      x.strokeStyle = css(hex(T.teal), 0.55); x.setLineDash([4, 4]); x.lineWidth = 1;
+      [L.border, tex.width - L.border].forEach(function (v) { x.beginPath(); x.moveTo(v * Z + 0.5, 0); x.lineTo(v * Z + 0.5, tex.height * Z); x.stroke(); });
+      [L.border, tex.height - L.border].forEach(function (v) { x.beginPath(); x.moveTo(0, v * Z + 0.5); x.lineTo(tex.width * Z, v * Z + 0.5); x.stroke(); });
+      c.setAttribute('role', 'img'); c.setAttribute('aria-label', name + ' 레이어');
+      var f = document.createElement('figure'), cap = document.createElement('figcaption');
+      cap.textContent = 'btn_r11_' + name + ' · ' + tex.width + '×' + tex.height + ' · slice ' + L.border;
+      f.appendChild(c); f.appendChild(cap); host.appendChild(f);
+    });
+  }
+
+  var SCALE = 1;
+  try { var saved = parseFloat(localStorage.getItem('ui-recipe-btn-scale')); if (saved) SCALE = saved; } catch (e) { /* 저장소 없음 */ }
+  function setScale(s) {
+    SCALE = s;
+    document.querySelectorAll('.seg').forEach(function (b) { b.setAttribute('aria-pressed', String(parseFloat(b.dataset.scale) === s)); });
+    try { localStorage.setItem('ui-recipe-btn-scale', String(s)); } catch (e) { /* 무시 */ }
+    buildStage(s);
+  }
+  document.querySelectorAll('.seg').forEach(function (b) { b.addEventListener('click', function () { setScale(parseFloat(b.dataset.scale)); }); });
+
+  function rebuildAll() { setScale(SCALE); document.getElementById('matrix').innerHTML = ''; document.getElementById('sheet').innerHTML = ''; buildMatrix(); buildSheet(); }
+  var kIn = document.getElementById('k'), kOut = document.getElementById('k-out');
+  kIn.addEventListener('input', function () { K = parseFloat(kIn.value); kOut.textContent = '×' + K; rebuildAll(); });
+  function start() { rebuildAll(); }
+  var fontsReady = document.fonts && document.fonts.load ? Promise.all([document.fonts.load('29px Jua'), document.fonts.load('12px Jua')]) : Promise.resolve();
+  // 폰트를 못 받아도(오프라인) 대체 글꼴로 그린다 — 비교 대상은 바탕 그림이라 라벨 글꼴은 양쪽 같기만 하면 된다
+  Promise.race([fontsReady, new Promise(function (r) { setTimeout(r, 1500); })]).then(start, start);
+})();
+</script>

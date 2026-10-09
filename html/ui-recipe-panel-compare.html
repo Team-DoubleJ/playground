@@ -1,0 +1,300 @@
+<title>패널 프레임 레시피 비교</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 레이아웃: 실제 패널 3종을 「현행 / 레시피」 두 줄로 같은 크기·같은 축척에 그린다 → 모서리 확대 → 굽는 텍스처 → 바뀌는 것.
+   색은 전부 게임 토큰(UiTheme.asset · ui-prototype.html :root). 신규 색 0. */
+:root {
+  color-scheme: dark;
+  --bg-deep: #070c11; --bg: #0b1218; --bg-rise: #12202c; --surface-card: #0a1017; --surface-b: #0e1620;
+  --btn-border: #26384a; --teal: #57d1b8; --text: #e2e8f0; --text-btn: #c9d6e2; --text-caption: #b9c6d3;
+  --muted: #7f8fa0; --rule: #1b2733;
+  --font-title: "Black Han Sans", "Jua", sans-serif;
+  --font-ui: "Jua", "IBM Plex Sans KR", sans-serif;
+  --font-body: "IBM Plex Sans KR", "Malgun Gothic", sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, monospace;
+}
+html, body { background: var(--bg-deep); color: var(--text); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--font-ui); font-weight: 400; text-wrap: balance; margin: 0; }
+h1 { font-size: 30px; } h2 { font-size: 21px; }
+p { margin: 0; max-width: 70ch; color: var(--text-caption); }
+.lede { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+section { display: grid; gap: 14px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.controls .lab { font-size: 13px; color: var(--muted); }
+.seg { font: 500 13px var(--font-mono); color: var(--text-btn); background: var(--surface-b); border: 1px solid var(--btn-border); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.seg[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
+.seg:focus-visible, input:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text-btn); cursor: pointer; }
+.chk input { accent-color: var(--teal); }
+.stage { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+.row { display: flex; flex-wrap: wrap; gap: 28px; padding: 24px; align-items: flex-start; }
+.col-h { font-family: var(--font-mono); font-size: 12px; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; padding: 18px 24px 0; }
+.col-h b { color: var(--text); font-weight: 500; }
+figure { margin: 0; display: grid; gap: 6px; }
+figcaption { font: 400 12px var(--font-mono); color: var(--muted); }
+canvas.px { image-rendering: pixelated; display: block; }
+.hint { font-size: 13px; color: var(--muted); }
+.zoom { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+.zoom .row { gap: 22px; }
+.sheet { display: flex; flex-wrap: wrap; gap: 18px; padding: 20px; border: 1px solid var(--rule); border-radius: 12px;
+  background-color: #0c1218; background-image: linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%), linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%);
+  background-size: 12px 12px; background-position: 0 0, 6px 6px; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.note { border-top: 2px solid var(--btn-border); padding-top: 12px; display: grid; gap: 6px; min-width: 0; }
+.note h3 { margin: 0; font: 600 15px var(--font-body); color: var(--text); }
+.note p, .note li { font-size: 14px; color: var(--text-caption); }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+code { font-family: var(--font-mono); font-size: .9em; color: var(--text-btn); background: var(--surface-b); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.ask { border: 1px solid var(--teal); border-radius: 12px; padding: 18px 20px; display: grid; gap: 8px; background: color-mix(in srgb, var(--teal) 6%, var(--bg)); }
+.ask h2 { color: var(--teal); }
+.ask ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; color: var(--text-caption); }
+</style>
+
+<div class="wrap">
+  <header class="lede">
+    <div class="eyebrow">UI 레시피 · 묶음 2 · 패널 프레임 <code>CanvasUi.Panel</code> (호출 26곳)</div>
+    <h1>패널 프레임 · 현행 vs 레시피</h1>
+    <p>윗줄은 지금 게임이 코드로 그리는 패널입니다(채움 + 위에서 옅어지는 램프 + 상단 림 + 둥근 테두리). 아랫줄은 버튼과 같은 방식으로 굽는 레시피 패널입니다.
+      채움색과 테두리색·두께는 지금처럼 각 화면이 정하고, 레시피는 그 위에 질감·그림자·빛만 더합니다. 모서리 장식은 아래 옵션으로 켜고 끌 수 있습니다.</p>
+  </header>
+
+  <section aria-labelledby="s1">
+    <h2 id="s1">화면에 놓았을 때</h2>
+    <div class="controls" role="group" aria-label="보기 옵션">
+      <span class="lab">화면 축척</span>
+      <button class="seg" data-scale="1" aria-pressed="true">×1</button>
+      <button class="seg" data-scale="0.664" aria-pressed="false">×0.664</button>
+      <span class="lab">질감 세기</span>
+      <input id="k" type="range" min="0.5" max="2" step="0.25" value="1.25" aria-label="질감 세기">
+      <output id="k-out" style="font:500 13px var(--font-mono);color:var(--teal)">×1.25</output>
+      <label class="chk"><input type="checkbox" id="opt-corner" checked> 모서리 장식</label>
+      <label class="chk"><input type="checkbox" id="opt-grain"> 결(2026-10-02 owner 판정으로 뺌 · 비교용)</label>
+    </div>
+    <div class="stage">
+      <div class="col-h"><b>현행</b> · CanvasUi 코드 그리기</div>
+      <div class="row" id="cur-row"></div>
+      <div class="col-h"><b>레시피</b> · 임포트 시 굽기</div>
+      <div class="row" id="rec-row"></div>
+    </div>
+    <p class="hint">게임과 같은 <b>리니어 블렌딩</b>으로 합성했습니다(게임은 Linear 색공간). 한 칸이 게임 픽셀 하나입니다. 결과 패널은 높이가 내용에 따라 바뀌어서 대표 높이 360으로 그렸습니다. 도전과제 패널은 실제로 화면 거의 전체(1880×1040)라 같은 테두리를 쓰는 카드 크기로 잘라 보였습니다.</p>
+  </section>
+
+  <section aria-labelledby="s2">
+    <h2 id="s2">왼쪽 위 모서리 3배 확대</h2>
+    <div class="zoom"><div class="row" id="zoom-row"></div></div>
+  </section>
+
+  <section aria-labelledby="s3">
+    <h2 id="s3">레시피가 굽는 텍스처</h2>
+    <p>반경 14 기준 레이어 7장입니다. (결 타일은 2026-10-02 owner 판정으로 융기 카드와 같이 뺐습니다 — 위 「결」 토글은 비교용으로만 남깁니다.) 전부 흰색이나 회색 바탕이고 색은 게임이 입힙니다. 테두리는 굵기에 따라 1단위와 2단위 중 하나를 씁니다. 점선이 9-slice 경계이고, 모서리 장식이 경계 안쪽에 들어가 있어서 패널이 커져도 장식은 늘어나지 않습니다.</p>
+    <div class="sheet" id="sheet"></div>
+  </section>
+
+  <section aria-labelledby="s4">
+    <h2 id="s4">포팅하면 바뀌는 것</h2>
+    <div class="notes">
+      <div class="note"><h3>그대로 두는 것</h3>
+        <ul><li>패널 채움색, 테두리색, 테두리 굵기는 지금처럼 각 화면이 정합니다(26곳 호출부 무변경).</li>
+          <li>색 토큰 신규 0. 정본 <code>ui-prototype.html</code> 토큰만 씁니다.</li></ul></div>
+      <div class="note"><h3>더해지는 것</h3>
+        <ul><li>바깥 그림자(아래로 3단위, 8단위에 걸쳐 옅어짐). 어두운 바탕에서도 패널이 떠 보입니다.</li>
+          <li>면의 가장자리 비네트와 광택·베벨. 평평한 단색이 아니라 판처럼 보입니다(결은 2026-10-02 에 뺐습니다).</li>
+          <li>모서리 장식. 테두리색을 따라가서, 도전과제 패널은 청록, 결과 패널은 회청색으로 나옵니다.</li></ul></div>
+      <div class="note"><h3>제약</h3>
+        <p>모서리 장식이 9-slice 모서리 칸에 들어가야 해서, 이 레시피를 쓰는 패널은 가로·세로가 52단위 이상이어야 합니다. 그보다 작은 패널(토스트·작은 배지)은 지금처럼 코드로 그립니다.</p></div>
+    </div>
+  </section>
+
+  <section class="ask" aria-labelledby="s5">
+    <h2 id="s5">owner 판정</h2>
+    <ol>
+      <li>✅ 확정(2026-10-01): 질감 세기 ×1.25 · 모서리 장식 켬 · 안쪽 베젤선 뺌("차이는 모르겠다")</li>
+    </ol>
+  </section>
+</div>
+
+<script src="ui-recipe-panel-bake.js"></script>
+<script src="ui-recipe-linear-composite.js"></script>
+<script>
+(function () {
+  'use strict';
+  var T = {
+    surfRaisedA: '#16202c', textBtn: '#c9d6e2', textTitle: '#eaf3f2', textCaption: '#b9c6d3',
+    surfaceCard: '#0a1017', overlayPanel: '#0a1017', hairline: '#1b2836',
+    resultBorder: [115, 133, 179, 0.70],   // ResultPanelBorderColor (0.45, 0.52, 0.70, 0.70)
+    accent: [87, 209, 184, 1],             // AchievementAccentColor (0.34, 0.82, 0.72)
+    scrim: [3, 5, 13, 0.4]                 // RunBoardLetterboxMaskColor
+  };
+  function hex(h) { h = h.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16), 1]; }
+  function rgba(c) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (c[3] == null ? 1 : c[3]) + ')'; }
+  function col(v) { return typeof v === 'string' ? hex(v) : v; }
+
+  // 실제 패널 3종 — 호출부 그대로: 채움색 · 테두리색 · 굵기 · 반경 14
+  var PANELS = [
+    { key: 'result', name: '결과 패널', where: 'MainMenuOverlayViews · 480 폭', w: 480, h: 360, fill: T.surfaceCard, border: T.resultBorder, th: 1.2,
+      title: '런 결과', lines: ['획득 골드  +2,987', '처치  148', '상자  3'] },
+    { key: 'settings', name: '설정 패널', where: 'SettingsView · Hairline 1', w: 420, h: 360, fill: T.overlayPanel, border: col(T.hairline), th: 1,
+      title: '설정', lines: ['효과음', '배경음', '저모션'] },
+    { key: 'ach', name: '도전과제 카드', where: 'MainMenuOverlayViews · Accent 1.2~2', w: 440, h: 120, fill: T.overlayPanel, border: T.accent, th: 2,
+      title: '첫 커밋', lines: ['노드 100개 처치'] }
+  ];
+
+  // ── 현행: Panel = 둥근 채움(r14) + Elevate(SurfaceRaisedTop 세로 알파 램프 t^1.15 + 상단 1.5px 림 TextBtn .24) + RoundedRing(굵기)
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  // lay() = 새 투명 레이어(Unity 의 Image 하나). 레이어끼리는 LinearComposite 가 게임처럼 리니어로 섞는다.
+  function drawCurrent(lay, ox, oy, p, s) {
+    var w = p.w * s, h = p.h * s, r = 14 * s;
+    var ctx = lay(); ctx.fillStyle = rgba(col(p.fill)); roundRect(ctx, ox, oy, w, h, r); ctx.fill();
+    ctx = lay();
+    // 램프: RoundedFade 는 좌우만 slice — 세로 전체에 걸쳐 위 1 → 아래 0 (감마 1.15)
+    var g = ctx.createLinearGradient(0, oy, 0, oy + h), A = hex(T.surfRaisedA);
+    for (var i = 0; i <= 10; i++) { var t = i / 10; g.addColorStop(t, 'rgba(' + A[0] + ',' + A[1] + ',' + A[2] + ',' + Math.pow(1 - t, 1.15) + ')'); }
+    ctx.fillStyle = g; roundRect(ctx, ox, oy, w, h, r); ctx.fill();
+    ctx = lay(); var tb = hex(T.textBtn); ctx.fillStyle = 'rgba(' + tb[0] + ',' + tb[1] + ',' + tb[2] + ',0.24)';
+    ctx.fillRect(ox + 14 * 0.6 * s, oy, w - 2 * 14 * 0.6 * s, 1.5 * s);
+    ctx = lay(); var th = p.th * s; ctx.strokeStyle = rgba(col(p.border)); ctx.lineWidth = th;
+    roundRect(ctx, ox + th / 2, oy + th / 2, w - th, h - th, Math.max(0, r - th / 2)); ctx.stroke();
+  }
+
+  // ── 레시피: 레이어 굽기 → 틴트 → 9-slice 합성(게임 순서 shadow → face → ramp → sheen → ring → corner)
+  //    2026-10-02 owner — 결을 뺐다(융기 카드와 질감 통일 *"b"*). OPT.grain 은 비교용 토글(기본 false = 게임).
+  var R = window.UiPanelRecipe, TX = R.TX, PAD = R.PAD, K = 1.25, OPT = { corner: true, grain: false };
+  var cache = {};
+  function layers(radius) {
+    var key = radius + ':' + K; if (cache[key]) return cache[key];
+    var sh = R.bakeSheet(radius, K), res = { border: sh.border, W: sh.cellW, H: sh.H, layer: {} };
+    R.LAYERS.forEach(function (name, l) {
+      var c = document.createElement('canvas'); c.width = sh.cellW; c.height = sh.H;
+      var cx = c.getContext('2d'), img = cx.createImageData(sh.cellW, sh.H);
+      for (var y = 0; y < sh.H; y++) for (var x = 0; x < sh.cellW; x++) {
+        var si = (y * sh.W + l * sh.cellW + x) * 4, di = (y * sh.cellW + x) * 4;
+        img.data[di] = sh.data[si]; img.data[di + 1] = sh.data[si + 1]; img.data[di + 2] = sh.data[si + 2]; img.data[di + 3] = sh.data[si + 3];
+      }
+      cx.putImageData(img, 0, 0); res.layer[name] = c;
+    });
+    return (cache[key] = res);
+  }
+  var tcache = {};
+  function tinted(radius, name, c) {
+    var key = radius + ':' + K + ':' + name + ':' + c.join(','); if (tcache[key]) return tcache[key];
+    var L = layers(radius), src = L.layer[name], cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height;
+    var x = cv.getContext('2d'); x.drawImage(src, 0, 0);
+    var img = x.getImageData(0, 0, cv.width, cv.height), a = c[3] == null ? 1 : c[3];
+    for (var i = 0; i < img.data.length; i += 4) { img.data[i] = img.data[i] * c[0] / 255; img.data[i + 1] = img.data[i + 1] * c[1] / 255; img.data[i + 2] = img.data[i + 2] * c[2] / 255; img.data[i + 3] = img.data[i + 3] * a; }
+    x.putImageData(img, 0, 0);
+    return (tcache[key] = { canvas: cv, border: L.border, W: cv.width, H: cv.height });
+  }
+  function drawSliced(ctx, tex, dx, dy, dw, dh, texelToPx) {
+    var b = tex.border, W = tex.W, H = tex.H, bx = b * texelToPx, by = b * texelToPx;
+    if (bx * 2 > dw) bx = dw / 2; if (by * 2 > dh) by = dh / 2;
+    var sx = [0, b, W - b, W], sy = [0, b, H - b, H], tx = [dx, dx + bx, dx + dw - bx, dx + dw], ty = [dy, dy + by, dy + dh - by, dy + dh];
+    for (var j = 0; j < 3; j++) for (var i = 0; i < 3; i++) {
+      var sw = sx[i + 1] - sx[i], shh = sy[j + 1] - sy[j], tw = tx[i + 1] - tx[i], th = ty[j + 1] - ty[j];
+      if (sw > 0 && shh > 0 && tw > 0 && th > 0) ctx.drawImage(tex.canvas, sx[i], sy[j], sw, shh, tx[i], ty[j], tw, th);
+    }
+  }
+  function drawRecipe(lay, ox, oy, p, s) {
+    var t2p = s / TX, dx = ox - PAD * s, dy = oy - PAD * s, dw = (p.w + 2 * PAD) * s, dh = (p.h + 2 * PAD) * s;
+    var b = col(p.border);
+    var seq = [['shadow', [255, 255, 255, 1]], ['face', col(p.fill)], ['ramp', hex(T.surfRaisedA)], ['sheen', hex(T.textBtn)], [p.th > 1.4 ? 'ring2' : 'ring1', b]];
+    if (OPT.corner) seq.push(['corner', b]);
+    seq.forEach(function (q, i) {
+      drawSliced(lay(), tinted(14, q[0], q[1]), dx, dy, dw, dh, t2p);
+      if (q[0] === 'sheen' && OPT.grain) drawGrain(lay(), ox, oy, p, s);   // 결 타일(비교용 · 기본 끔)은 광택 바로 위(테두리 아래)
+    });
+  }
+  // 결 타일 — Image.Type.Tiled 재현: 원본 크기(64 텍셀 = 32 단위)로 반복, 안쪽 GRAIN_INSET 단위 사각형에만
+  var grainCache = {};
+  function grainTile() {
+    if (grainCache[K]) return grainCache[K];
+    var g = R.bakeGrainTile(K), c = document.createElement('canvas'); c.width = g.W; c.height = g.H;
+    var x = c.getContext('2d'), img = x.createImageData(g.W, g.H), tb = hex(T.textBtn);
+    for (var i = 0; i < g.data.length; i += 4) { img.data[i] = tb[0]; img.data[i + 1] = tb[1]; img.data[i + 2] = tb[2]; img.data[i + 3] = g.data[i + 3]; }
+    x.putImageData(img, 0, 0);
+    return (grainCache[K] = c);
+  }
+  function drawGrain(ctx, ox, oy, p, s) {
+    var tile = grainTile(), inset = R.GRAIN_INSET * s, tw = tile.width / R.GRAIN_TX * s, th = tile.height / R.GRAIN_TX * s;
+    var x0 = ox + inset, y0 = oy + inset, x1 = ox + p.w * s - inset, y1 = oy + p.h * s - inset;
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+    for (var y = y0; y < y1; y += th) for (var x = x0; x < x1; x += tw) ctx.drawImage(tile, x, y, tw, th);
+    ctx.restore();
+  }
+
+  function content(ctx, ox, oy, p, s) {
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    ctx.fillStyle = T.textTitle; ctx.font = (26 * s) + 'px "Black Han Sans", Jua, sans-serif';
+    ctx.fillText(p.title, ox + 28 * s, oy + 52 * s);
+    ctx.fillStyle = T.textCaption; ctx.font = (18 * s) + 'px "IBM Plex Sans KR", sans-serif';
+    p.lines.forEach(function (l, i) { ctx.fillText(l, ox + 28 * s, oy + (90 + i * 34) * s); });
+  }
+
+  function makePanel(p, kind, s) {
+    var m = PAD + 4, cw = Math.ceil((p.w + 2 * m) * s), ch = Math.ceil((p.h + 2 * m) * s);
+    var cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; cv.className = 'px';
+    cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+    var ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low';
+    var ox = m * s, oy = m * s, layers = [];
+    function lay() { var L = window.LinearComposite.layer(cw, ch); layers.push(L.canvas); return L.ctx; }
+    if (kind === 'cur') drawCurrent(lay, ox, oy, p, s); else drawRecipe(lay, ox, oy, p, s);
+    ctx.drawImage(window.LinearComposite.stack(cw, ch, '#0b1218', layers), 0, 0);   // 바탕 = --bg(보정 기준 REF_BG)
+    content(ctx, ox, oy, p, s);
+    cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', (kind === 'cur' ? '현행 ' : '레시피 ') + p.name);
+    return cv;
+  }
+  function fig(cv, cap) { var f = document.createElement('figure'), c = document.createElement('figcaption'); c.textContent = cap; f.appendChild(cv); f.appendChild(c); return f; }
+
+  var SCALE = 1;
+  function build() {
+    ['cur', 'rec'].forEach(function (k) {
+      var row = document.getElementById(k + '-row'); row.innerHTML = '';
+      PANELS.forEach(function (p) { row.appendChild(fig(makePanel(p, k, SCALE), p.name + ' · ' + p.where)); });
+    });
+    var z = document.getElementById('zoom-row'); z.innerHTML = '';
+    PANELS.forEach(function (p) {
+      ['cur', 'rec'].forEach(function (k) {
+        var src = makePanel(p, k, 1), Z = 3, cw = 64, chh = 64, m = PAD + 4 - 6;
+        var c = document.createElement('canvas'); c.width = cw * Z; c.height = chh * Z; c.className = 'px'; c.style.width = (cw * Z) + 'px'; c.style.height = (chh * Z) + 'px';
+        var x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(src, m, m, cw, chh, 0, 0, cw * Z, chh * Z);
+        c.setAttribute('role', 'img'); c.setAttribute('aria-label', p.name + (k === 'cur' ? ' 현행' : ' 레시피') + ' 모서리 확대');
+        z.appendChild(fig(c, p.name + ' · ' + (k === 'cur' ? '현행' : '레시피')));
+      });
+    });
+    var sheet = document.getElementById('sheet'); sheet.innerHTML = '';
+    var L = layers(14);
+    R.LAYERS.forEach(function (name) {
+      var tex = L.layer[name], Z = 3, c = document.createElement('canvas'); c.width = tex.width * Z; c.height = tex.height * Z; c.className = 'px';
+      c.style.width = (tex.width * Z) + 'px'; c.style.height = (tex.height * Z) + 'px';
+      var x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(tex, 0, 0, tex.width * Z, tex.height * Z);
+      x.strokeStyle = 'rgba(87,209,184,0.55)'; x.setLineDash([4, 4]);
+      [L.border, tex.width - L.border].forEach(function (v) { x.beginPath(); x.moveTo(v * Z + 0.5, 0); x.lineTo(v * Z + 0.5, tex.height * Z); x.stroke(); });
+      [L.border, tex.height - L.border].forEach(function (v) { x.beginPath(); x.moveTo(0, v * Z + 0.5); x.lineTo(tex.width * Z, v * Z + 0.5); x.stroke(); });
+      c.setAttribute('role', 'img'); c.setAttribute('aria-label', name + ' 레이어');
+      sheet.appendChild(fig(c, 'panel_r14_' + name + ' · ' + tex.width + '×' + tex.height));
+    });
+  }
+
+  document.querySelectorAll('.seg').forEach(function (b) {
+    b.addEventListener('click', function () {
+      SCALE = parseFloat(b.dataset.scale);
+      document.querySelectorAll('.seg').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      build();
+    });
+  });
+  var kIn = document.getElementById('k'), kOut = document.getElementById('k-out');
+  kIn.addEventListener('input', function () { K = parseFloat(kIn.value); kOut.textContent = '×' + K; build(); });
+  document.getElementById('opt-corner').addEventListener('change', function (e) { OPT.corner = e.target.checked; build(); });
+  document.getElementById('opt-grain').addEventListener('change', function (e) { OPT.grain = e.target.checked; build(); });
+
+  var ready = document.fonts && document.fonts.load ? Promise.all([document.fonts.load('26px "Black Han Sans"'), document.fonts.load('18px "IBM Plex Sans KR"')]) : Promise.resolve();
+  Promise.race([ready, new Promise(function (r) { setTimeout(r, 1500); })]).then(build, build);
+})();
+</script>
