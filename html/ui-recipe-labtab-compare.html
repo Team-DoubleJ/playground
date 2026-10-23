@@ -1,0 +1,595 @@
+<!--
+  ui-recipe-labtab-compare.html — 「UI 레시피 묶음 ④ 연구소 탭」 **비교 목업**(2026-10-03 · owner 판정 완료 — 맨 아래 「owner 판정」 절).
+  기본값 = owner 판정 = 게임 구현(`CanvasUi.NewLabTab` · `LabShellView.SyncShell`): ①②③④ 켬 · ⑤ 폴더 끔 · 질감 ×1.25.
+    `renderScene` 의 rec 분기가 게임 레이어 순서·색 입히기의 정본이다(EditMode `RecipeArtUiLabTabTests` 가 이 파일을 읽어 대조한다).
+  무엇의 비교본인가: 연구소 탭 스트립(LabShellView.BuildShell · SyncShell — 탭 7 + 구분선 + 배지 + 빨간 점)의
+    「현행(main 3cd8f81a 이 실제로 그리는 것 = 버튼 레시피 btn_r11 + 색 갈아끼우기)」 ↔ 「탭 전용 레시피 후보」.
+  ⚠ 화면 정본이 아니다 — 비주얼 정본은 html/ui-prototype.html(연구소 탭 절 · 2026-10-03 구현에 맞춰 갱신)이고, 이 파일은 현행 ↔ 레시피 비교본이다.
+  의존: 같은 폴더의 js 3개만(상대 경로 · 외부 CDN 0) — ui-recipe-button-bake.js(현행 열 · 읽기만) · ui-recipe-labtab-bake.js(레시피 열) · ui-recipe-linear-composite.js(리니어 합성).
+  file:// 로 열어도 동작한다. ?probe=1 = 엔진 대조용 원시 픽셀 덤프(헤드리스 검증용).
+-->
+<title>연구소 탭 레시피 비교</title>
+<style>
+/* 레이아웃: 탭 바 전체(1920 폭 · 가로 스크롤)를 「현행 / 레시피」 두 줄로 → 확대 → 상태 표 → 굽는 텍스처 → 엔진 대조 → 결정 문항.
+   버튼·패널·카드 목업과 같은 틀. 색은 전부 게임 토큰(UiTheme.asset). 신규 색 0. 합성은 리니어(게임 = Linear 색공간). */
+:root {
+  color-scheme: dark;
+  --bg-deep: #070c11; --bg: #0a1017; --surface-b: #0e1620;
+  --btn-border: #26384a; --teal: #57d1b8; --text: #e2e8f0; --text-btn: #c9d6e2; --text-caption: #b9c6d3;
+  --muted: #7f8fa0; --rule: #1b2733;
+  --font-ui: "Jua", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --font-body: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --font-mono: Consolas, "SF Mono", Menlo, monospace;
+}
+html, body { background: var(--bg-deep); color: var(--text); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.6; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--font-ui); font-weight: 400; text-wrap: balance; margin: 0; }
+h1 { font-size: 30px; } h2 { font-size: 21px; }
+p { margin: 0; max-width: 72ch; color: var(--text-caption); }
+.lede { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+section { display: grid; gap: 14px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.controls .lab { font-size: 13px; color: var(--muted); }
+.seg { font: 500 13px var(--font-mono); color: var(--text-btn); background: var(--surface-b); border: 1px solid var(--btn-border); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.seg[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
+.seg:focus-visible, input:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text-btn); cursor: pointer; }
+.chk input, input[type=range] { accent-color: var(--teal); }
+.stage { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+.stage .row { padding: 14px 0 10px; border-top: 1px solid var(--rule); width: max-content; }
+.stage .row:first-child { border-top: 0; }
+.stage .ttl { font: 500 12px var(--font-mono); letter-spacing: .08em; color: var(--muted); padding: 0 24px 8px; position: sticky; left: 0; width: max-content; }
+.stage .ttl b { color: var(--text); font-weight: 500; }
+canvas.px { image-rendering: pixelated; display: block; }
+canvas.live { cursor: pointer; }
+.hint { font-size: 13px; color: var(--muted); }
+.matrix { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+table { border-collapse: collapse; width: max-content; }
+.matrix th, .matrix td { padding: 8px 14px; border-bottom: 1px solid var(--rule); vertical-align: middle; text-align: left; }
+.matrix th { font: 500 12px var(--font-mono); letter-spacing: .08em; color: var(--muted); }
+.matrix td.state { font-family: var(--font-ui); font-size: 16px; white-space: nowrap; }
+.matrix td.state small, .matrix td.tok { font: 400 11.5px var(--font-mono); color: var(--muted); letter-spacing: .02em; }
+.matrix td.state small { display: block; }
+.matrix td.tok { max-width: 340px; white-space: normal; line-height: 1.5; }
+.matrix tr:last-child td { border-bottom: 0; }
+.sheet { display: flex; flex-wrap: wrap; gap: 18px; padding: 20px; border: 1px solid var(--rule); border-radius: 12px;
+  background-color: #0c1218; background-image: linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%), linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%);
+  background-size: 12px 12px; background-position: 0 0, 6px 6px; }
+figure { margin: 0; display: grid; gap: 6px; justify-items: start; }
+figcaption { font: 400 12px var(--font-mono); color: var(--muted); }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.note { border-top: 2px solid var(--btn-border); padding-top: 12px; display: grid; gap: 6px; min-width: 0; align-content: start; }
+.note h3 { margin: 0; font: 600 15px var(--font-body); color: var(--text); }
+.note p, .note li { font-size: 14px; color: var(--text-caption); }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+code { font-family: var(--font-mono); font-size: .9em; color: var(--text-btn); background: var(--surface-b); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.ask { border: 1px solid var(--teal); border-radius: 12px; padding: 18px 20px; display: grid; gap: 8px; background: color-mix(in srgb, var(--teal) 6%, var(--bg)); }
+.ask h2 { color: var(--teal); }
+.ask ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--text-caption); }
+.ask b.rec { color: var(--teal); font-weight: 600; }
+.meter { font: 400 12px var(--font-mono); color: var(--muted); }
+.meter b { color: var(--teal); font-weight: 500; }
+table.m { border-collapse: collapse; font: 400 12px var(--font-mono); color: var(--text-caption); }
+table.m th, table.m td { padding: 4px 10px; border-bottom: 1px solid var(--rule); text-align: right; font-variant-numeric: tabular-nums; }
+table.m th:first-child, table.m td:first-child { text-align: left; }
+table.m th { color: var(--muted); font-weight: 400; }
+.tbl { overflow-x: auto; }
+.tag { font: 500 11px var(--font-mono); color: var(--bg-deep); background: var(--teal); border-radius: 4px; padding: 1px 6px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="lede">
+    <div class="eyebrow">UI 레시피 · 묶음 4 · 연구소 탭 <code>LabShellView</code> 탭 스트립</div>
+    <h1>연구소 탭 · 현행 vs 레시피</h1>
+    <p class="meter">엔진 대조(현행 열 · Unity 리니어 RenderTexture 1920×104 · Play 없이 임시 Canvas): <span id="engine-line">현행 열 표본 16곳 최대 2/255 · 면 평균 차 0.3 이하 · 전 픽셀 평균 차 0.62 (아래 「엔진 대조」 표)</span></p>
+    <p>지금 연구소 탭 7개는 탭 전용 그림이 없고 메뉴 버튼과 같은 구운 버튼(묶음 1)을 그대로 씁니다. 활성 탭은 테두리를 청록으로, 채움을 짙은 초록으로, 글자를 굵게 바꾸는 것으로만 표시합니다.
+      레시피판은 탭 전용 레이어를 굽습니다. 테두리 색과 채움색은 지금처럼 게임이 입히므로 기존 코드의 색 갈아끼우기는 그대로 동작합니다. 탭 폭·높이·간격·개수·라벨·배지·빨간 점 위치는 바꾸지 않습니다.</p>
+    <p>탭을 클릭하면 두 줄이 함께 바뀝니다. 마우스를 올리거나 누르면 그 줄만 호버·눌림 상태가 됩니다. <b>레시피 줄은 목업의 리니어 합성값입니다. 게임 구현을 엔진에서 캡처해 대조했고(아래 「엔진 대조 · 레시피 열」), 면·링·밑줄 막대·구분선은 1/255 이내, 옅은 청록 빛(밑줄 번짐 · 접합 빛)은 이 페이지 쪽이 최대 8/255 어긋납니다.</b></p>
+  </header>
+
+  <section aria-labelledby="s1">
+    <h2 id="s1">탭 바 전체 · 1920 폭 기준 실제 크기</h2>
+    <div class="controls" role="group" aria-label="보기 옵션">
+      <span class="lab">화면 축척</span>
+      <button class="seg" data-scale="1" aria-pressed="true">1920×1080 · ×1</button>
+      <button class="seg" data-scale="0.664" aria-pressed="false">1275×717 · ×0.664</button>
+      <span class="lab">질감 세기</span>
+      <input id="k" type="range" min="0.5" max="2" step="0.25" value="1.25" aria-label="질감 세기">
+      <output id="k-out" style="font:500 13px var(--font-mono);color:var(--teal)">×1.25</output>
+    </div>
+    <div class="controls" role="group" aria-label="레시피 제안 요소">
+      <span class="lab">레시피 제안 요소</span>
+      <label class="chk"><input type="checkbox" id="opt-indicator" checked> ① 활성 밑줄 발광</label>
+      <label class="chk"><input type="checkbox" id="opt-inset" checked> ② 비활성 눌린 깊이감</label>
+      <label class="chk"><input type="checkbox" id="opt-divider" checked> ③ 구분선 끝 옅게</label>
+      <label class="chk"><input type="checkbox" id="opt-stem" checked> ④ 접합 빛(탭 → 본문)</label>
+      <label class="chk"><input type="checkbox" id="opt-folder"> ⑤ 폴더 탭 모양(아래 모서리 각지게)</label>
+    </div>
+    <div class="stage" id="stage">
+      <div class="row"><div class="ttl"><b>현행</b> · 버튼 레시피 btn_r11 + 색 갈아끼우기 (main 이 지금 그리는 것)</div><div id="cur-strip"></div></div>
+      <div class="row"><div class="ttl"><b>레시피</b> · 탭 전용 레이어 (목업 리니어 합성값 · 엔진 대조 완료)</div><div id="rec-strip"></div></div>
+    </div>
+    <p class="hint">가로로 스크롤하면 오른쪽 탭과 「← 메인 메뉴」 버튼까지 보입니다. 한 칸이 게임 픽셀 하나이고, 게임과 같은 <b>리니어 블렌딩</b>으로 합성했습니다. 바탕은 연구소 배경 토큰 <code>OverlayPanelColor</code>(#0a1017)입니다.
+      탭 아래 밝은 면은 본문 패널이 시작하는 자리(y 88)를 표시한 것이고 실제 본문은 탭마다 다릅니다. 글자는 이 PC에 주아·Pretendard가 없으면 대체 글꼴로 나옵니다(비교 대상은 바탕 그림입니다). 배지 숫자는 예시 값입니다.</p>
+  </section>
+
+  <section aria-labelledby="s2">
+    <h2 id="s2">활성 탭과 옆 탭 · 3배 확대</h2>
+    <div class="stage"><div class="row"><div class="ttl"><b>현행</b></div><div id="cur-zoom"></div></div>
+      <div class="row"><div class="ttl"><b>레시피</b></div><div id="rec-zoom"></div></div></div>
+  </section>
+
+  <section aria-labelledby="s3">
+    <h2 id="s3">상태별</h2>
+    <p>색 토큰은 <code>Assets/Resources/UI/UiTheme.asset</code> 값입니다. 채움은 버튼의 ColorTint가 면 레이어에 곱하는 색이고, 링은 <code>SyncShell</code>이 테두리 이미지에 넣는 색입니다. 레시피 열은 같은 색을 그대로 받습니다.</p>
+    <div class="matrix"><table>
+      <thead><tr><th>상태</th><th>현행</th><th>레시피</th><th>게임이 입히는 색(현행·레시피 공통)</th></tr></thead>
+      <tbody id="matrix"></tbody>
+    </table></div>
+    <p class="hint">「활성 + 호버」는 현행에서 채움이 호버색으로 바뀌어 짙은 초록이 사라집니다(ColorTint의 highlighted가 normal을 덮습니다). 링은 청록으로 남습니다. 레시피판은 밑줄이 따로 있어 호버 중에도 활성 표시가 남습니다.</p>
+  </section>
+
+  <section aria-labelledby="s4">
+    <h2 id="s4">레시피가 굽는 텍스처</h2>
+    <p>반경 11 한 벌입니다. 레이어 6장(그림자 · 테두리 · 면 · 광택 · 눌린 그늘 · 밑줄)과 낱장 2장(접합 빛 · 구분선)이고 전부 흰색·회색이나 검정 알파 바탕입니다. 색은 게임이 입힙니다.
+      텍스처 1칸은 게임 0.5단위이고 점선이 9-slice 경계(30텍셀 = 바깥 여백 4 + 반경 11 단위)입니다. 결은 owner 판정(카드·패널에서 끔)을 따라 굽지 않습니다.</p>
+    <div class="sheet" id="sheet"></div>
+  </section>
+
+  <section aria-labelledby="s5">
+    <h2 id="s5">질감 세기 슬라이더가 실제로 바꾸는 양</h2>
+    <p>탭 면 안쪽(변에서 6단위 안) 평균 밝기입니다(0–255, 세 채널 평균). 현행은 슬라이더와 무관합니다.</p>
+    <div class="tbl"><table class="m" id="mtable"></table></div>
+  </section>
+
+  <section aria-labelledby="s6">
+    <h2 id="s6">엔진 대조 · 현행 열</h2>
+    <p>현행 열이 게임과 같은지 Unity 에디터에서 숫자로 확인했습니다. Play 없이 임시 Canvas에 <code>CanvasUi.NewButton</code>으로 탭 7개를 게임과 같은 좌표에 만들고 리니어 RenderTexture(1920×104)로 읽었습니다. 탭 0 활성 · 1~2·4 비활성 · 3 비활성화 · 5 호버 · 6 눌림, 라벨 없이.
+      레시피 열 대조는 바로 아래 표입니다.</p>
+    <div class="tbl"><table class="m" id="engine-table">
+      <tr><th>표본(게임 좌표 · sRGB 0–255)</th><th>엔진 R,G,B</th><th>목업 현행 열 R,G,B</th><th>최대 채널 차</th></tr>
+      <tr><td>배경 (5,5)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>활성 탭 면 평균(변에서 6 안)</td><td>10.10, 30.78, 22.56</td><td>10.23, 30.62, 22.37</td><td>0.19</td></tr>
+      <tr><td>비활성 탭 면 평균</td><td>17.10, 26.93, 34.28</td><td>17.14, 26.81, 34.00</td><td>0.28</td></tr>
+      <tr><td>비활성화 탭 면 평균</td><td>10.10, 17.22, 27.07</td><td>10.23, 17.14, 26.81</td><td>0.26</td></tr>
+      <tr><td>호버 탭 면 평균</td><td>22.41, 30.78, 43.00</td><td>22.37, 30.62, 42.71</td><td>0.29</td></tr>
+      <tr><td>눌림 탭 면 평균</td><td>17.10, 22.50, 30.85</td><td>17.14, 22.37, 30.62</td><td>0.23</td></tr>
+      <tr><td>활성 링 · 위 (144,16)</td><td>101, 209, 188</td><td>101, 209, 188</td><td>0</td></tr>
+      <tr><td>활성 링 · 왼 (24,44)</td><td>86, 209, 184</td><td>86, 209, 184</td><td>0</td></tr>
+      <tr><td>활성 링 · 아래 (144,71)</td><td>60, 150, 131</td><td>59, 150, 131</td><td>1</td></tr>
+      <tr><td>비활성 링 · 위 (391,16)</td><td>70, 83, 96</td><td>70, 83, 97</td><td>1</td></tr>
+      <tr><td>비활성 링 · 왼 (271,44)</td><td>32, 45, 61</td><td>30, 45, 59</td><td>2</td></tr>
+      <tr><td>비활성 링 · 아래 (391,71)</td><td>24, 37, 50</td><td>24, 37, 49</td><td>1</td></tr>
+      <tr><td>상단 림 (391,17)</td><td>100, 109, 117</td><td>100, 110, 116</td><td>1</td></tr>
+      <tr><td>탭 아래 그림자 (391,73)</td><td>9, 9, 16</td><td>9, 9, 16</td><td>0</td></tr>
+      <tr><td>구분선 (1010,44)</td><td>130, 142, 161</td><td>130, 142, 161</td><td>0</td></tr>
+      <tr><td>빨간 점 중심 (497,44)</td><td>240, 69, 69</td><td>240, 69, 69</td><td>0</td></tr>
+      <tr><td>전 픽셀 1920×104</td><td colspan="2">평균 차 0.62 · 차 &gt; 8 인 픽셀 34개(빨간 점 가장자리 · 비활성화 탭 모서리)</td><td>표본 최대 2</td></tr>
+    </table></div>
+    <p class="hint">처음 대조에서는 면 평균이 3~4 어긋났습니다. 원인은 두 가지였고 둘 다 목업에 반영했습니다. ① 색 입히기는 리니어에서 곱해집니다(어두운 색은 감마에서 곱한 것보다 더 어둡습니다). ② uGUI는 색을 리니어 8비트로 반올림해 싣습니다. 그래서 연구소 배경 토큰 #0a1017이 화면에서는 #0d0d16으로 나옵니다.
+      남은 차이: 광택 띠(위에서 4~7번째 줄)의 낱개 픽셀이 최대 4 어긋납니다(브라우저 캔버스의 낮은 알파 정밀도). 빨간 점 가장자리는 브라우저 원과 게임 스프라이트의 안티에일리어싱이 달라 30픽셀쯤 크게 다릅니다.</p>
+  </section>
+
+  <section aria-labelledby="s6b">
+    <h2 id="s6b">엔진 대조 · 레시피 열</h2>
+    <p>포팅한 게임 구현(<code>CanvasUi.NewLabTab</code> · <code>SyncLabTab</code> · <code>LabTabDivider</code>)을 같은 방법(Play 없이 임시 Canvas → 리니어 RenderTexture 1920×104)과 같은 장면(탭 0 활성 · 3 비활성화 · 5 호버 · 6 눌림 · 탭 1 빨간 점 · 접합 빛 포함)으로 캡처해 이 페이지의 레시피 열과 비교했습니다(2026-10-03).</p>
+    <div class="tbl"><table class="m">
+      <tr><th>표본(게임 좌표 · sRGB 0–255)</th><th>엔진 R,G,B</th><th>목업 레시피 열 R,G,B</th><th>최대 채널 차</th></tr>
+      <tr><td>배경 (5,5)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>활성 면 평균(가운데 띠 y 28–58)</td><td>9.17, 30.43, 22.03</td><td>9.23, 30.26, 22.02</td><td>0.17</td></tr>
+      <tr><td>비활성 면 평균(변에서 6 안 · 눌린 그늘 포함)</td><td>15.90, 25.87, 33.12</td><td>15.90, 25.85, 33.20</td><td>0.08</td></tr>
+      <tr><td>비활성화 / 호버 / 눌림 면 평균</td><td colspan="2">차 0.04 / 0.15 / 0.15</td><td>0.15</td></tr>
+      <tr><td>활성 링 · 위 (144,16) / 왼 (24,44) / 아래 (144,71)</td><td>101,209,188 / 86,209,184 / 60,150,131</td><td>101,209,188 / 86,209,184 / 59,150,131</td><td>1</td></tr>
+      <tr><td>비활성 링 · 위 (391,16) / 왼 (271,44) / 아래 (391,71)</td><td>38,56,73 / 31,45,60 / 24,37,50</td><td>38,56,73 / 31,45,61 / 24,37,49</td><td>1</td></tr>
+      <tr><td>밑줄 막대 중심 (144,69)</td><td>86, 209, 184</td><td>86, 209, 184</td><td>0</td></tr>
+      <tr><td>밑줄 위 번짐 (144,66)</td><td>14, 47, 39</td><td>10, 49, 39</td><td>4</td></tr>
+      <tr><td>비활성 눌린 그늘 · 위 (391,17) / (391,19)</td><td>11,20,25 / 17,27,34</td><td>11,19,25 / 17,27,34</td><td>1</td></tr>
+      <tr><td>접합 빛 · 맨 위 (144,72) / 중간 (144,79) / 맨 아래 (144,87)</td><td>37,94,83 / 19,39,39 / 13,13,22</td><td>34,93,82 / 18,38,36 / 13,13,22</td><td>3</td></tr>
+      <tr><td>구분선 · 중앙 (1010,44) / 위쪽 끝 (1010,20) · (1010,17)</td><td>126,137,156 / 46,51,61 · 18,20,28</td><td>126,138,156 / 46,50,60 · 17,17,25</td><td>3</td></tr>
+      <tr><td>전 픽셀 1920×104</td><td colspan="2">평균 차 0.32 · 차 &gt; 3 인 픽셀 3,150개(전부 활성 탭의 옅은 빛 구간 + 빨간 점 가장자리 18) · 차 &gt; 8 은 빨간 점 가장자리 14개뿐</td><td>활성 탭 최대 8</td></tr>
+    </table></div>
+    <p class="hint">차가 3을 넘는 곳은 전부 활성 탭의 <b>알파가 아주 낮은 빛</b>(밑줄 위 번짐 · 탭 아래 발광 · 접합 빛 · 빛 띠 끝)입니다. 같은 텍스처로 실수 정밀도 리니어 합성을 따로 계산해 보면 엔진은 그 값과 최대 2/255(20,500픽셀 중 차 &gt; 3 은 0개), 이 페이지는 최대 8/255(3,447개) 어긋납니다.
+      즉 틀린 쪽은 이 페이지입니다. 브라우저 캔버스가 색을 알파와 미리 곱해 8비트로 저장해서, 알파가 1~10/255인 픽셀은 색이 뭉개집니다(현행 열의 광택 띠 오차와 같은 원인). 게임이 owner가 승인한 그림보다 정확한 쪽이라 게임은 고치지 않았고, 이 페이지의 합성 방식도 그대로 뒀습니다.
+      접합 빛은 본문 윗변 2줄 전(y 86)에서 0이 되어 본문 패널과 겹치지 않습니다(개요 본문 융기 카드 · <code>FramePanel</code> 둘 다 확인 — 켬/끔 차 0).</p>
+  </section>
+
+  <section aria-labelledby="s7">
+    <h2 id="s7">포팅하면 바뀌는 것</h2>
+    <div class="notes">
+      <div class="note"><h3>그대로 두는 것</h3>
+        <ul><li>탭 폭 239.43 · 높이 56 · 간격 8 · 반경 11 · 7개 · 구분선 위치(장비 앞)</li>
+          <li>라벨(주아 17 · 활성만 굵게 · 색 동일), 배지(금색 10), 빨간 점(8) 위치와 색</li>
+          <li><code>SyncShell</code>의 링 색·채움색 갈아끼우기. 상태색 토큰 전부. 신규 색 0</li>
+          <li>「← 메인 메뉴」 버튼은 일반 버튼 그대로</li></ul></div>
+      <div class="note"><h3>바뀌는 것</h3>
+        <ul><li>탭이 일반 버튼과 다른 전용 그림을 씁니다(버튼의 가로 결은 빠집니다)</li>
+          <li>켠 제안 요소마다 레이어가 하나씩 늘고, <code>SyncShell</code>이 활성 여부에 따라 그 레이어를 켜고 끕니다(버튼의 포커스 발광과 같은 방식)</li>
+          <li>구분선이 1px 직선에서 구운 세로선으로 바뀝니다(③을 켠 경우)</li></ul></div>
+      <div class="note"><h3>정본과 다른 점(참고)</h3>
+        <ul><li><code>ui-prototype.html</code>의 연구소 탭은 상자 없이 청록 글자 + 청록 밑줄 2px입니다. 구현은 상자형 버튼 + 청록 링 + 초록 채움 + 굵은 흰 글자입니다(2026-08-29, 09-13 owner 결정으로 바뀐 것이 정본에 반영되지 않았습니다)</li>
+          <li>정본에는 배지와 빨간 점이 없습니다(<code>lab-ia.html</code>에만 있습니다)</li>
+          <li>2026-10-03 포팅과 함께 정본의 탭 절을 구현(상자형 탭 · 4요소 · 배지 · 빨간 점 · 구분선)에 맞게 고쳤습니다</li></ul></div>
+    </div>
+  </section>
+
+  <section class="ask" aria-labelledby="s8">
+    <h2 id="s8">owner 판정 (2026-10-03)</h2>
+    <p>원문: <code>1,2,3,4 까지만 적용 5는 굳이 폴더탭 안해도될 듯 ㅇㅇ 질감세기느 1.25 ㄱㄱ</code></p>
+    <ol id="asks">
+      <li><b>활성 밑줄 발광(①)</b> — <b class="rec">켬</b>. 활성 탭 아래쪽에 청록 밑줄과 번지는 빛</li>
+      <li><b>비활성 탭 눌린 깊이감(②)</b> — <b class="rec">켬</b>. 비활성 탭은 그림자·광택을 빼고 안쪽 위 그늘, 활성 탭만 솟아 보이게</li>
+      <li><b>구분선(③)</b> — <b class="rec">위아래 끝이 옅어지는 구운 선</b></li>
+      <li><b>접합 빛(④)</b> — <b class="rec">켬</b>. 목업 추천은 「끔」 이었고 owner가 켰습니다. 활성 탭 아래에서 본문 위(간격 16)까지 옅은 청록 빛</li>
+      <li><b>탭 모양(⑤)</b> — <b class="rec">폴더 탭 안 함</b>. 네 모서리 둥글게 유지(위 체크박스는 비교용으로만 남겼습니다)</li>
+      <li><b>질감 세기</b> — <b class="rec">×1.25</b>(버튼·패널·카드와 같음)</li>
+    </ol>
+    <p>게임 구현: <code>CanvasUi.NewLabTab</code> · <code>SyncLabTab</code> · <code>LabTabDivider</code> + <code>LabShellView.SyncShell</code>. 굽는 쪽: recipe-art <code>ui_labtab</code> 드로어(v0.7.0 · 둥근 모양만).</p>
+  </section>
+</div>
+
+<script src="ui-recipe-button-bake.js"></script>
+<script src="ui-recipe-labtab-bake.js"></script>
+<script src="ui-recipe-linear-composite.js"></script>
+<script>
+(function () {
+  'use strict';
+  // ── 게임 토큰 — Assets/Resources/UI/UiTheme.asset 의 값 그대로(0..1 실수 · RGBA). 신규 색 0.
+  //    검증 스크립트가 이 블록을 UiTheme.asset 과 대조한다(드리프트면 실패) — 손으로 고치지 말 것.
+  var THEME = /*THEME*/{
+    OverlayPanelColor: [0.039, 0.063, 0.09, 1],
+    SurfaceRaisedTopColor: [0.086, 0.125, 0.173, 1],
+    SurfaceRaisedBottomColor: [0.055, 0.086, 0.125, 1],
+    ButtonBorderColor: [0.149, 0.22, 0.29, 1],
+    ButtonHoverFillTopColor: [0.114, 0.157, 0.212, 1],
+    ButtonHoverFillBottomColor: [0.075, 0.114, 0.157, 1],
+    TextTitleColor: [0.918, 0.953, 0.949, 1],
+    TextBtnColor: [0.788, 0.839, 0.886, 1],
+    MenuCursorColor: [0.34, 0.82, 0.72, 1],
+    MenuFocusFillColor: [0.05, 0.15, 0.12, 1],
+    MenuSubtitleColor: [0.55, 0.6, 0.68, 0.85],
+    kGoldenNodeTint: [0.96, 0.91, 0.35, 1],
+    WeaponAwakenRedColor: [0.94, 0.27, 0.27, 1]
+  }/*END*/;
+  function tok(name) { var c = THEME[name]; return [Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255), c[3]]; }
+  function hexOf(c) { return '#' + [0, 1, 2].map(function (i) { return ('0' + c[i].toString(16)).slice(-2); }).join(''); }
+  var WHITE = [255, 255, 255, 1];
+
+  // ── 엔진이 색을 다루는 방식(2026-10-03 엔진 캡처로 확인 — 「엔진 대조」 절):
+  //   ① 틴트(Image.color · ColorTint)는 **리니어에서** 텍스처에 곱해진다. sRGB 곡선은 어두운 쪽이 직선 구간이라
+  //      "감마에서 곱하나 리니어에서 곱하나 같다" 가 어두운 틴트(채널 10~40)에서는 성립하지 않는다(활성 탭 면 R 12.4 → 실제 10.1).
+  //   ② uGUI 는 색을 Color32 로 만든 뒤 **리니어 8비트로 반올림**해 정점에 싣는다 ⇒ 아주 어두운 색은 계단이 굵다
+  //      (연구소 바탕 OverlayPanelColor #0a1017 → 화면에는 #0d0d16).
+  //   둘 다 현행·레시피 공통으로 적용한다(목업 = 게임).
+  var LIN = new Float32Array(256);
+  for (var li = 0; li < 256; li++) { var lc = li / 255; LIN[li] = lc <= 0.04045 ? lc / 12.92 : Math.pow((lc + 0.055) / 1.055, 2.4); }
+  function toSrgb8(l) { var c = l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(l, 1 / 2.4) - 0.055; return Math.round(Math.max(0, Math.min(1, c)) * 255); }
+  var QUANT = true;   // ?quant=0 으로 끄면 양자화 없는 대조 실행
+  function tintLin(c) { return [0, 1, 2].map(function (i) { return QUANT ? Math.round(LIN[c[i]] * 255) / 255 : LIN[c[i]]; }); }
+  /** 화면에 실제로 나오는 색(sRGB 8비트) — 단색 사각형·글자용 */
+  function shown(c) { var t = tintLin(c); return [toSrgb8(t[0]), toSrgb8(t[1]), toSrgb8(t[2]), c[3]]; }
+  function rgba(c) { c = shown(c); return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (c[3] == null ? 1 : c[3]) + ')'; }
+  function bgHex() { return hexOf(shown(tok('OverlayPanelColor'))); }
+
+  // ── 게임 기하 — LabShellView.cs / MvpGameController.UI.cs 상수(주석 = 심볼명)
+  var G = /*GEOM*/{
+    virtualW: 1920,          // kVirtualW
+    shellMargin: 24,         // ShellMargin
+    shellTop: 16,            // ShellTop
+    stripH: 56,              // LabTabStripHeight
+    tabGap: 8,               // LabTabGap = CanvasUi.GapMd
+    tabCount: 7,             // LabTabCount
+    backW: 132,              // LabBackButtonWidth
+    backGap: 16,             // LabBackButtonGap
+    bodyGap: 16,             // LabTabStripBodyGap
+    radius: 11,              // CanvasUi.ButtonCornerRadius
+    dividerIndex: 4,         // TabDividerIndex
+    fontTab: 17,             // FontTabActive(활성·비활성 공통)
+    fontBack: 12,            // FontTabIdle = CanvasUi.FontSmallButton
+    fontBadge: 10,           // FontTabBadge
+    labelEdge: 0.54,         // TabLabelRightEdge = TabWidth × 0.54
+    badgeGap: 6,             // TabBadgeGap = CanvasUi.GapSm
+    dot: 8,                  // TabDotSize
+    dotInset: 10             // TabDotRightInset
+  }/*END*/;
+  G.stripW = G.virtualW - G.shellMargin * 2 - G.backW - G.backGap;          // TabStripWidth 1724
+  G.tabW = (G.stripW - G.tabGap * (G.tabCount - 1)) / G.tabCount;           // TabWidth 239.4286
+  G.backX = G.shellMargin + G.stripW + G.backGap;                           // BackButtonX 1764
+  G.bodyY = G.shellTop + G.stripH + G.bodyGap;                              // GetLabBodyRect().y 88
+  var TITLES = ['개요', '노드 화면', '무기 패널', '소켓·젬', '장비', '젬 뽑기', '젬 합성'];   // _tabTitles
+  var BADGES = { 1: '3', 2: 'Lv.6', 3: '2/4' };                             // HasTabBadge 1·2·3 — 값은 예시
+  var DOT_TABS = { 1: true, 2: true, 3: true, 4: true };                    // HasTabDot = SignalAxisTab {1,4,2,3}
+  var DOTS_ON = { 1: true, 4: true };                                       // 예시: 노드 화면 · 장비에 미확인 점
+
+  var BTN = window.UiButtonRecipe, TAB = window.UiLabTabRecipe, TX = TAB.TX, PAD = TAB.PAD;
+  var K = 1.25;
+  var OPT = { indicator: true, inset: true, divider: true, stem: true, folder: false };   // 기본값 = owner 판정(2026-10-03) = 게임
+
+  // ── 굽기 결과를 레이어별 캔버스로
+  function toCanvas(w, h, data, sx, sw, stride) {
+    var c = document.createElement('canvas'); c.width = sw; c.height = h;
+    var ctx = c.getContext('2d'), img = ctx.createImageData(sw, h);
+    for (var y = 0; y < h; y++) for (var x = 0; x < sw; x++) {
+      var si = (y * stride + sx + x) * 4, di = (y * sw + x) * 4;
+      img.data[di] = data[si]; img.data[di + 1] = data[si + 1]; img.data[di + 2] = data[si + 2]; img.data[di + 3] = data[si + 3];
+    }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
+  var bakeCache = {};
+  function curLayers() {   // 현행 = 게임 레시피 btn_r11.fxrecipe(params.strength 1.25 고정 — 슬라이더와 무관)
+    if (bakeCache.cur) return bakeCache.cur;
+    var sh = BTN.bakeSheet(G.radius, 1.25), res = { b: sh.border, layer: {} };
+    BTN.LAYERS.forEach(function (n, l) { res.layer[n] = toCanvas(sh.W, sh.H, sh.data, l * sh.cellW, sh.cellW, sh.W); });
+    return (bakeCache.cur = res);
+  }
+  function recLayers() {
+    var key = 'rec:' + K + ':' + OPT.folder; if (bakeCache[key]) return bakeCache[key];
+    var r = TAB.bakeRecipes(G.radius, K, { shape: OPT.folder ? 'folder' : 'round' }), sh = r.tab, res = { b: sh.border, layer: {} };
+    TAB.LAYERS.forEach(function (n, l) { res.layer[n] = toCanvas(sh.W, sh.H, sh.data, l * sh.cellW, sh.cellW, sh.W); });
+    res.layer.stem = toCanvas(r.stem.W, r.stem.H, r.stem.data, 0, r.stem.W, r.stem.W); res.stemB = r.stem.border[0];
+    res.layer.divider = toCanvas(r.divider.W, r.divider.H, r.divider.data, 0, r.divider.W, r.divider.W);
+    return (bakeCache[key] = res);
+  }
+  // Image.color 곱하기 — Unity 처럼 **리니어에서** 텍스처 RGB × 색(정점 색은 리니어 8비트 반올림), 알파 × 색 알파
+  var tintCache = {};
+  function tinted(setKey, src, c) {
+    var key = setKey + ':' + QUANT + ':' + c.join(','); if (tintCache[key]) return tintCache[key];
+    var cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height;
+    var x = cv.getContext('2d'); x.drawImage(src, 0, 0);
+    var img = x.getImageData(0, 0, cv.width, cv.height), a = c[3] == null ? 1 : c[3], t = tintLin(c);
+    for (var i = 0; i < img.data.length; i += 4) {
+      img.data[i] = toSrgb8(LIN[img.data[i]] * t[0]); img.data[i + 1] = toSrgb8(LIN[img.data[i + 1]] * t[1]); img.data[i + 2] = toSrgb8(LIN[img.data[i + 2]] * t[2]);
+      img.data[i + 3] = img.data[i + 3] * a;
+    }
+    x.putImageData(img, 0, 0);
+    return (tintCache[key] = cv);
+  }
+  // 텍스처 없는 사각형(구분선 등) — GPU 래스터처럼 **픽셀 중심이 안에 든 칸만** 칠한다(안티에일리어싱 없음)
+  function quadRect(ctx, x, y, w, h) {
+    var xa = Math.ceil(x - 0.5), xb = Math.ceil(x + w - 0.5), ya = Math.ceil(y - 0.5), yb = Math.ceil(y + h - 0.5);
+    if (xb > xa && yb > ya) ctx.fillRect(xa, ya, xb - xa, yb - ya);
+  }
+  // Unity Image.Type.Sliced — 경계 합이 목적 크기를 넘으면 경계를 눌러 담는다. bx/by = 텍셀 경계 · t2p = 텍셀 → 화면 px
+  function drawSliced(ctx, cv, dx, dy, dw, dh, t2p, bxT, byT) {
+    var W = cv.width, H = cv.height, bx = bxT * t2p, by = byT * t2p;
+    if (bx * 2 > dw) bx = dw / 2; if (by * 2 > dh) by = dh / 2;
+    var sx = [0, bxT, W - bxT, W], sy = [0, byT, H - byT, H], tx = [dx, dx + bx, dx + dw - bx, dx + dw], ty = [dy, dy + by, dy + dh - by, dy + dh];
+    for (var j = 0; j < 3; j++) for (var i = 0; i < 3; i++) {
+      var sw = sx[i + 1] - sx[i], sh = sy[j + 1] - sy[j], tw = tx[i + 1] - tx[i], th = ty[j + 1] - ty[j];
+      if (sw > 0 && sh > 0 && tw > 0 && th > 0) ctx.drawImage(cv, sx[i], sy[j], sw, sh, tx[i], ty[j], tw, th);
+    }
+  }
+
+  // ── 상태 → 게임이 입히는 색. ColorTint: disabled > pressed > highlighted > normal(= SyncShell 이 갈아끼운 normalColor/selectedColor)
+  function fillOf(t) {
+    if (t.state === 'disabled') return tok('SurfaceRaisedBottomColor');
+    if (t.state === 'pressed') return tok('ButtonHoverFillBottomColor');
+    if (t.state === 'hover') return tok('ButtonHoverFillTopColor');
+    if (t.plain) return tok('SurfaceRaisedTopColor');
+    return t.active ? tok('MenuFocusFillColor') : tok('SurfaceRaisedTopColor');
+  }
+  function ringOf(t) { return t.active && !t.plain ? tok('MenuCursorColor') : tok('ButtonBorderColor'); }
+
+  // 장면 = 탭 목록을 z 단계별 공유 레이어에 그린 뒤 리니어로 쌓는다(탭끼리는 겹치지 않으므로 같은 단계는 한 캔버스를 같이 쓴다).
+  //   현행 순서(CanvasUi.BuildRecipeButtonBackdrop): Shadow 흰 → Ring 링색 → Fill ColorTint → Sheen TextBtn → (Glow 꺼짐) → 점 · 구분선
+  //   레시피 순서: stem → shadow → ring → face → sheen|inset → indicator → 점 · 구분선
+  function renderScene(kind, sc) {
+    var s = sc.s || 1, cw = Math.ceil(sc.W * s), ch = Math.ceil(sc.H * s), levels = [];
+    function L(i) { if (!levels[i]) levels[i] = window.LinearComposite.layer(cw, ch); return levels[i].ctx; }
+    var t2p = s / TX;
+    if (sc.body) {   // 본문 패널 자리 표시 — 융기면 윗부분(SurfaceRaisedTop 램프의 맨 위 ≈ 불투명) + 상단 림
+      var b = L(0), by = G.bodyY * s, bx = G.shellMargin * s, bw = (G.virtualW - 2 * G.shellMargin) * s, br = 14 * s;
+      b.fillStyle = rgba(tok('SurfaceRaisedTopColor'));
+      b.beginPath(); b.moveTo(bx, ch); b.lineTo(bx, by + br); b.arcTo(bx, by, bx + br, by, br); b.lineTo(bx + bw - br, by); b.arcTo(bx + bw, by, bx + bw, by + br, br); b.lineTo(bx + bw, ch); b.closePath(); b.fill();
+    }
+    sc.tabs.forEach(function (t) {
+      var dx = (t.x - PAD) * s, dy = (t.y - PAD) * s, dw = (t.w + 2 * PAD) * s, dh = (t.h + 2 * PAD) * s;
+      if (kind === 'cur' || t.plain) {
+        var C = curLayers();
+        [['shadow', WHITE], ['ring', ringOf(t)], ['face', fillOf(t)], ['sheen', tok('TextBtnColor')]].forEach(function (p, i) {
+          drawSliced(L(2 + i), tinted('cur:' + p[0], C.layer[p[0]], p[1]), dx, dy, dw, dh, t2p, C.b, C.b);
+        });
+      } else {
+        var R = recLayers(), rk = 'rec:' + K + ':' + OPT.folder + ':';
+        var put = function (lv, name, c) { drawSliced(L(lv), tinted(rk + name, R.layer[name], c), dx, dy, dw, dh, t2p, R.b, R.b); };
+        var raised = t.active || !OPT.inset;
+        if (t.active && OPT.stem) drawSliced(L(1), tinted(rk + 'stem', R.layer.stem, tok('MenuCursorColor')), t.x * s, (t.y + t.h) * s, t.w * s, G.bodyGap * s, t2p, R.stemB, 0);
+        if (raised) put(2, 'shadow', WHITE);
+        put(3, 'ring', ringOf(t));
+        put(4, 'face', fillOf(t));
+        if (raised) put(5, 'sheen', tok('TextBtnColor')); else put(5, 'inset', WHITE);
+        if (t.active && OPT.indicator) put(6, 'indicator', tok('MenuCursorColor'));
+      }
+      if (t.dot) {   // CanvasUi.NewImage(radius 4) = 지름 8 원 · WeaponAwakenRedColor
+        var d = L(7), r = G.dot / 2;
+        d.fillStyle = rgba(tok('WeaponAwakenRedColor')); d.beginPath();
+        d.arc((t.x + t.w - G.dotInset - r) * s, (t.y + t.h / 2) * s, r * s, 0, Math.PI * 2); d.fill();
+      }
+    });
+    (sc.dividers || []).forEach(function (dv) {
+      var d = L(7);
+      if (kind === 'rec' && OPT.divider) {   // 구운 구분선 — 3 단위 폭 텍스처(가운데 1 단위가 선)라 같은 중심에 3 단위 폭으로 놓는다
+        var R = recLayers();
+        d.drawImage(tinted('rec:divider', R.layer.divider, tok('MenuSubtitleColor')), (dv.x - 1) * s, dv.y * s, 3 * s, dv.h * s);
+      } else { d.fillStyle = rgba(tok('MenuSubtitleColor')); quadRect(d, dv.x * s, dv.y * s, 1 * s, dv.h * s); }
+    });
+    var out = window.LinearComposite.stack(cw, ch, bgHex(), levels.filter(Boolean).map(function (l) { return l.canvas; }));
+    out.className = 'px'; out.style.width = cw + 'px'; out.style.height = ch + 'px';
+    if (!sc.bare) text(out.getContext('2d'), sc, s);
+    return out;
+  }
+  // 라벨·배지 — 신호가 있는 탭은 라벨을 경계(폭×0.54)까지 오른쪽 정렬, 배지는 경계+6 부터 왼쪽 정렬(BuildTabSignals)
+  function text(ctx, sc, s) {
+    ctx.textBaseline = 'middle';
+    sc.tabs.forEach(function (t) {
+      if (!t.label) return;
+      var cy = (t.y + t.h / 2 + 1) * s, size = (t.font || G.fontTab) * s;
+      ctx.fillStyle = rgba(t.plain ? tok('TextBtnColor') : tok('TextTitleColor'));
+      ctx.font = (t.active && !t.plain ? 'bold ' : '') + size + 'px Jua, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
+      if (t.signals) { ctx.textAlign = 'right'; ctx.fillText(t.label, (t.x + t.w * G.labelEdge) * s, cy); }
+      else { ctx.textAlign = 'center'; ctx.fillText(t.label, (t.x + t.w / 2) * s, cy); }
+      if (t.badge) {
+        ctx.fillStyle = rgba(tok('kGoldenNodeTint')); ctx.textAlign = 'left';
+        ctx.font = (G.fontBadge * s) + 'px Pretendard, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
+        ctx.fillText(t.badge, (t.x + t.w * G.labelEdge + G.badgeGap) * s, cy);
+      }
+    });
+  }
+
+  // ── 탭 바 장면(게임 좌표 그대로). state = { active, hover, down, disabledAll }
+  var STRIP_H = 112;
+  function stripScene(st, s, bare) {
+    var tabs = [];
+    for (var i = 0; i < G.tabCount; i++) {
+      var hasSig = !!(BADGES[i] || DOT_TABS[i]);
+      tabs.push({ x: G.shellMargin + i * (G.tabW + G.tabGap), y: G.shellTop, w: G.tabW, h: G.stripH, label: TITLES[i], active: st.active === i,
+        state: st.disabledAll ? 'disabled' : st.down === i ? 'pressed' : st.hover === i ? 'hover' : 'normal',
+        signals: hasSig, badge: BADGES[i], dot: !!DOTS_ON[i] && st.active !== i });
+    }
+    tabs.push({ x: G.backX, y: G.shellTop, w: G.backW, h: G.stripH, label: '← 메인 메뉴', font: G.fontBack, plain: true,
+      state: st.disabledAll ? 'disabled' : st.down === 7 ? 'pressed' : st.hover === 7 ? 'hover' : 'normal' });
+    var dvx = G.shellMargin + G.dividerIndex * (G.tabW + G.tabGap) - G.tabGap * 0.5;
+    return { W: G.virtualW, H: STRIP_H, s: s, tabs: tabs, body: true, bare: bare, dividers: [{ x: dvx, y: G.shellTop, h: G.stripH }] };
+  }
+  function hitTab(sc, ux, uy) {
+    for (var i = 0; i < sc.tabs.length; i++) { var t = sc.tabs[i]; if (ux >= t.x && ux < t.x + t.w && uy >= t.y && uy < t.y + t.h) return i; }
+    return -1;
+  }
+
+  var SCALE = 1, ACTIVE = 0;
+  var LOCAL = { cur: { hover: -1, down: -1 }, rec: { hover: -1, down: -1 } };
+  function paintStrip(kind) {
+    var host = document.getElementById(kind + '-strip'), st = { active: ACTIVE, hover: LOCAL[kind].hover, down: LOCAL[kind].down };
+    var sc = stripScene(st, SCALE), cv = renderScene(kind, sc);
+    cv.classList.add('live'); cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', (kind === 'cur' ? '현행' : '레시피') + ' 연구소 탭 바 · 활성 탭 ' + TITLES[ACTIVE]);
+    function at(e) { var r = cv.getBoundingClientRect(); return hitTab(sc, (e.clientX - r.left) / SCALE, (e.clientY - r.top) / SCALE); }
+    cv.addEventListener('pointermove', function (e) { var i = at(e); if (i !== LOCAL[kind].hover) { LOCAL[kind].hover = i; paintStrip(kind); } });
+    cv.addEventListener('pointerleave', function () { if (LOCAL[kind].hover !== -1 || LOCAL[kind].down !== -1) { LOCAL[kind].hover = -1; LOCAL[kind].down = -1; paintStrip(kind); } });
+    cv.addEventListener('pointerdown', function (e) { LOCAL[kind].down = at(e); paintStrip(kind); });
+    cv.addEventListener('pointerup', function (e) {
+      var i = at(e); LOCAL[kind].down = -1;
+      if (i >= 0 && i < G.tabCount) { ACTIVE = i; build(); } else paintStrip(kind);
+    });
+    host.innerHTML = ''; host.appendChild(cv);
+  }
+  function paintZoom(kind) {
+    var a = Math.min(ACTIVE, G.tabCount - 2);   // 활성 탭 + 오른쪽 이웃(마지막 탭이면 왼쪽 이웃)
+    var src = renderScene(kind, stripScene({ active: ACTIVE, hover: -1, down: -1 }, 1));
+    var x0 = Math.floor(G.shellMargin + a * (G.tabW + G.tabGap)) - 10, w = Math.ceil(G.tabW * 1.6), y0 = 6, h = 92, Z = 3;
+    var c = document.createElement('canvas'); c.width = w * Z; c.height = h * Z; c.className = 'px'; c.style.width = (w * Z) + 'px'; c.style.height = (h * Z) + 'px';
+    var x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(src, x0, y0, w, h, 0, 0, w * Z, h * Z);
+    c.setAttribute('role', 'img'); c.setAttribute('aria-label', (kind === 'cur' ? '현행' : '레시피') + ' 활성 탭 확대');
+    var host = document.getElementById(kind + '-zoom'); host.innerHTML = ''; host.appendChild(c);
+  }
+
+  // ── 상태 표 — 탭 하나씩(정수 좌표)
+  function hx(n) { var c = tok(n); return n.replace(/Color$/, '') + ' ' + hexOf(c) + (c[3] < 1 ? ' α' + c[3] : ''); }
+  var ROWS = [
+    { name: '활성', sub: '_labTab == 이 탭', t: { active: true, state: 'normal', label: '개요' }, tok: function () { return '채움 ' + hx('MenuFocusFillColor') + ' · 링 ' + hx('MenuCursorColor') + ' · 라벨 굵게 ' + hx('TextTitleColor'); } },
+    { name: '비활성', sub: 'normal', t: { state: 'normal', label: '젬 뽑기' }, tok: function () { return '채움 ' + hx('SurfaceRaisedTopColor') + ' · 링 ' + hx('ButtonBorderColor') + ' · 라벨 ' + hx('TextTitleColor'); } },
+    { name: '비활성 + 호버', sub: 'highlighted', t: { state: 'hover', label: '젬 뽑기' }, tok: function () { return '채움 ' + hx('ButtonHoverFillTopColor') + ' · 링 그대로'; } },
+    { name: '활성 + 호버', sub: 'highlighted', t: { active: true, state: 'hover', label: '개요' }, tok: function () { return '채움 ' + hx('ButtonHoverFillTopColor') + '(초록이 사라짐) · 링 ' + hx('MenuCursorColor'); } },
+    { name: '눌림', sub: 'pressed', t: { state: 'pressed', label: '젬 뽑기' }, tok: function () { return '채움 ' + hx('ButtonHoverFillBottomColor'); } },
+    { name: '비활성화', sub: '젬 합성 연출 중 · CanvasGroup.interactable = false', t: { state: 'disabled', label: '젬 뽑기' }, tok: function () { return '채움 ' + hx('SurfaceRaisedBottomColor') + ' · 탭 7개 + ← 메인 메뉴 전부'; } },
+    { name: '배지', sub: '노드 화면 · 무기 패널 · 소켓·젬', t: { state: 'normal', label: '무기 패널', signals: true, badge: 'Lv.6' }, tok: function () { return '배지 ' + hx('kGoldenNodeTint') + ' · Pretendard 10 · 라벨 오른쪽 6 단위'; } },
+    { name: '배지 + 빨간 점', sub: 'SyncSignals 미확인', t: { state: 'normal', label: '노드 화면', signals: true, badge: '3', dot: true }, tok: function () { return '점 ' + hx('WeaponAwakenRedColor') + ' · 지름 8 · 오른쪽에서 10 단위'; } },
+    { name: '활성 + 배지', sub: '활성 탭은 점이 꺼진다', t: { active: true, state: 'normal', label: '소켓·젬', signals: true, badge: '2/4' }, tok: function () { return '배지 색·크기는 활성/비활성 무관'; } }
+  ];
+  function oneTab(kind, t, s) {
+    var w = Math.round(G.tabW), m = 12, tt = { x: m, y: m, w: w, h: G.stripH };
+    Object.keys(t).forEach(function (k) { tt[k] = t[k]; });
+    var cv = renderScene(kind, { W: w + 2 * m, H: G.stripH + 2 * m + (kind === 'rec' && OPT.stem ? 8 : 0), s: s || 1, tabs: [tt], bare: !t.label });
+    cv._ox = m; cv._oy = m; cv._w = w;
+    return cv;
+  }
+  function buildMatrix() {
+    var tb = document.getElementById('matrix'); tb.innerHTML = '';
+    ROWS.forEach(function (r) {
+      var tr = document.createElement('tr'), td = document.createElement('td'); td.className = 'state';
+      td.innerHTML = r.name + '<small>' + r.sub + '</small>'; tr.appendChild(td);
+      ['cur', 'rec'].forEach(function (k) {
+        var c = document.createElement('td'), cv = oneTab(k, r.t);
+        cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', (k === 'cur' ? '현행 ' : '레시피 ') + r.name);
+        c.appendChild(cv); tr.appendChild(c);
+      });
+      var tk = document.createElement('td'); tk.className = 'tok'; tk.textContent = r.tok(); tr.appendChild(tk);
+      tb.appendChild(tr);
+    });
+  }
+
+  function fig(cv, cap) { var f = document.createElement('figure'), c = document.createElement('figcaption'); c.textContent = cap; f.appendChild(cv); f.appendChild(c); return f; }
+  function buildSheet() {
+    var host = document.getElementById('sheet'), R = recLayers(), Z = 3; host.innerHTML = '';
+    TAB.LAYERS.concat(['stem', 'divider']).forEach(function (name) {
+      var tex = R.layer[name], c = document.createElement('canvas');
+      var zw = name === 'divider' ? 8 : 1;   // 구분선은 2 텍셀 폭이라 보기용으로만 가로 8배
+      c.width = tex.width * Z * zw; c.height = tex.height * Z; c.className = 'px'; c.style.width = c.width + 'px'; c.style.height = c.height + 'px';
+      var x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(tex, 0, 0, c.width, c.height);
+      x.strokeStyle = 'rgba(87,209,184,0.55)'; x.setLineDash([4, 4]);
+      var bxs = name === 'divider' ? [] : name === 'stem' ? [R.stemB, tex.width - R.stemB] : [R.b, tex.width - R.b];
+      var bys = name === 'divider' || name === 'stem' ? [] : [R.b, tex.height - R.b];
+      bxs.forEach(function (v) { x.beginPath(); x.moveTo(v * Z + 0.5, 0); x.lineTo(v * Z + 0.5, c.height); x.stroke(); });
+      bys.forEach(function (v) { x.beginPath(); x.moveTo(0, v * Z + 0.5); x.lineTo(c.width, v * Z + 0.5); x.stroke(); });
+      c.setAttribute('role', 'img'); c.setAttribute('aria-label', 'labtab ' + name + ' 레이어');
+      // 게임 스프라이트 이름: 시트 칸 labtab_r11_<layer> · 낱장 labtab_r11_stem · labtab_divider(반경과 무관)
+      host.appendChild(fig(c, (name === 'divider' ? 'labtab_divider' : 'labtab_r11_' + name) + ' · ' + tex.width + '×' + tex.height));
+    });
+  }
+
+  // 면 안쪽(변에서 6 단위 안) 평균 밝기 — 라벨 없이 그린 탭 하나로 잰다
+  function meanInner(kind, t) {
+    var cv = oneTab(kind, { active: t.active, state: t.state }), x = cv.getContext('2d');
+    var w = cv._w - 12, h = G.stripH - 12, d = x.getImageData(cv._ox + 6, cv._oy + 6, w, h).data, s = 0;
+    for (var i = 0; i < d.length; i += 4) s += (d[i] + d[i + 1] + d[i + 2]) / 3;
+    return s / (w * h);
+  }
+  function buildMeter() {
+    var keep = K, ks = [0.5, 1, 1.25, 1.5, 2];
+    var rows = [['비활성', { state: 'normal' }], ['활성', { active: true, state: 'normal' }], ['비활성 + 호버', { state: 'hover' }]].map(function (r) {
+      var cur = meanInner('cur', r[1]), vals = ks.map(function (k) { K = k; return meanInner('rec', r[1]); }); K = keep;
+      return '<tr><td>' + r[0] + '</td><td>' + cur.toFixed(1) + '</td>' + vals.map(function (v) { return '<td>' + v.toFixed(1) + '</td>'; }).join('') + '<td>' + (vals[4] - vals[0] >= 0 ? '+' : '') + (vals[4] - vals[0]).toFixed(1) + '</td></tr>';
+    });
+    document.getElementById('mtable').innerHTML = '<tr><th>상태</th><th>현행</th>' + ks.map(function (k) { return '<th>레시피 ×' + k + '</th>'; }).join('') + '<th>양 끝 ×2 − ×0.5</th></tr>' + rows.join('');
+  }
+
+  function build() { paintStrip('cur'); paintStrip('rec'); paintZoom('cur'); paintZoom('rec'); buildMatrix(); buildSheet(); buildMeter(); }
+
+  document.querySelectorAll('.seg').forEach(function (b) {
+    b.addEventListener('click', function () {
+      SCALE = parseFloat(b.dataset.scale);
+      document.querySelectorAll('.seg').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      paintStrip('cur'); paintStrip('rec');
+    });
+  });
+  var kIn = document.getElementById('k'), kOut = document.getElementById('k-out');
+  kIn.addEventListener('input', function () { K = parseFloat(kIn.value); kOut.textContent = '×' + K; build(); });
+  var OPTS = ['indicator', 'inset', 'divider', 'stem', 'folder'];
+  OPTS.forEach(function (k) { document.getElementById('opt-' + k).addEventListener('change', function (e) { OPT[k] = e.target.checked; build(); }); });
+  // ?k=1.5&stem=1&active=2 … — 헤드리스 렌더 검증용
+  var q = new URLSearchParams(location.search);
+  if (q.has('k')) { K = parseFloat(q.get('k')); kIn.value = K; kOut.textContent = '×' + K; }
+  if (q.has('active')) ACTIVE = parseInt(q.get('active'), 10) || 0;
+  if (q.get('quant') === '0') QUANT = false;
+  OPTS.forEach(function (k) { if (q.has(k)) { OPT[k] = q.get(k) === '1'; document.getElementById('opt-' + k).checked = OPT[k]; } });
+
+  // ?probe=1 — 엔진 대조용: 엔진 캡처와 같은 장면(1920×104 · 라벨·본문 없음 · 탭 0 활성 · 3 비활성화 · 5 호버 · 6 눌림 · 탭 1 에 점 · 구분선)의 원시 RGBA(base64)
+  function probe() {
+    var tabs = [], states = ['normal', 'normal', 'normal', 'disabled', 'normal', 'hover', 'pressed'];
+    for (var i = 0; i < G.tabCount; i++) tabs.push({ x: G.shellMargin + i * (G.tabW + G.tabGap), y: G.shellTop, w: G.tabW, h: G.stripH, active: i === 0, state: states[i], dot: i === 1 });
+    var sc = { W: G.virtualW, H: 104, s: 1, tabs: tabs, bare: true, dividers: [{ x: G.shellMargin + 4 * (G.tabW + G.tabGap) - 4, y: G.shellTop, h: G.stripH }] };
+    var out = { tabW: G.tabW };
+    ['cur', 'rec'].forEach(function (k) {
+      var d = renderScene(k, sc).getContext('2d').getImageData(0, 0, sc.W, sc.H).data, bin = '';
+      for (var j = 0; j < d.length; j += 8192) bin += String.fromCharCode.apply(null, d.subarray(j, j + 8192));
+      out[k] = btoa(bin);
+    });
+    out.K = K; out.opt = OPT; out.theme = THEME; out.geom = G;
+    var pre = document.createElement('pre'); pre.id = 'probe'; pre.style.display = 'none'; pre.textContent = JSON.stringify(out); document.body.appendChild(pre);
+  }
+  build();
+  if (q.get('probe') === '1') probe();
+})();
+</script>

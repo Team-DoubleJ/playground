@@ -1,0 +1,688 @@
+<!--
+  ui-recipe-progress-compare.html — 「UI 레시피 묶음 ⑤ 진행바·트랙」 **비교 목업**(2026-10-03 · owner 판정 완료 — 맨 아래 「owner 판정」 절).
+  기본값 = owner 판정(`1a 2a 3a 4a 5a 6a`) = 게임 구현(`CanvasUi.NewGaugeTrack` · `NewGaugeFill` · `RecipeGaugeFit`): ①②③④⑥ 켬 · ⑤ 눈금 끔 · 질감 ×1.25.
+    `drawBar` 의 rec 분기가 게임 레이어 순서·좌표·색 입히기·판정 규칙의 정본이다(EditMode `RecipeArtUiGaugeTests` 가 이 파일을 읽어 대조한다).
+  무엇의 비교본인가: Canvas 진행바 6종(런 HUD XP · 피버 게이지 · 무기 레벨 · 연구소 개요 카드 · 도전과제 · 장비 타임라인)의
+    「현행(main c67190f9 이 실제로 그리는 것 = 절차식 RoundedFill 트랙 1장 + 채움 1장)」 ↔ 「진행바 전용 레시피 후보」.
+  ⚠ 화면 정본이 아니다 — 비주얼 정본은 html/ui-prototype.html 이고, 이 파일은 현행 ↔ 레시피 비교본이다(정본 반영은 승인 후).
+  ⚠ 레시피 열은 **목업의 리니어 합성값**이다. 게임 구현은 있지만(2026-10-03 포팅) 레시피 열의 엔진 캡처 대조는 아직 안 했다 — 현행 열만 대조했다(아래 「엔진 대조」).
+  합성: 이 파일 안의 실수(float) 버퍼 합성기 — 레이어를 리니어 실수로 쌓고 **마지막에 한 번만** 8비트로 내린다
+    (묶음 4 에서 확인된 「브라우저 캔버스 premultiplied 8비트가 옅은 빛을 최대 8/255 뭉갠다」 를 피한다. 공용 ui-recipe-linear-composite.js 는 쓰지 않는다).
+  의존: 같은 폴더의 js 2개만(상대 경로 · 외부 CDN 0) — ui-recipe-progress-bake.js(레시피 열) · ui-recipe-card-bake.js(런 HUD 패널 바탕 · 읽기만).
+  file:// 로 열어도 동작한다. ?probe=1 = 엔진 대조용 원시 픽셀 덤프(헤드리스 검증용) · ?t=50&k=1.25&groove=0 … = 헤드리스 렌더 검증용.
+-->
+<title>진행바 레시피 비교</title>
+<style>
+/* 레이아웃: 화면 맥락 3종(현행 / 레시피 두 줄 + 확대) → 범위 안 바 전부 표 → 굽는 텍스처 → 엔진 대조 → 범위 → 결정 문항.
+   버튼·패널·카드·탭 목업과 같은 틀. 색은 전부 게임 토큰(UiTheme.asset). 신규 색 0. 합성은 리니어(게임 = Linear 색공간). */
+:root {
+  color-scheme: dark;
+  --bg-deep: #070c11; --bg: #0a1017; --surface-b: #0e1620;
+  --btn-border: #26384a; --teal: #57d1b8; --text: #e2e8f0; --text-btn: #c9d6e2; --text-caption: #b9c6d3;
+  --muted: #7f8fa0; --rule: #1b2733;
+  --font-ui: "Jua", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --font-body: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --font-mono: Consolas, "SF Mono", Menlo, monospace;
+}
+html, body { background: var(--bg-deep); color: var(--text); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.6; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--font-ui); font-weight: 400; text-wrap: balance; margin: 0; }
+h1 { font-size: 30px; } h2 { font-size: 21px; }
+p { margin: 0; max-width: 72ch; color: var(--text-caption); }
+.lede { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+section { display: grid; gap: 14px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.controls .lab { font-size: 13px; color: var(--muted); }
+.sticky { position: sticky; top: 0; z-index: 5; background: var(--bg-deep); padding: 10px 0; border-bottom: 1px solid var(--rule); display: grid; gap: 8px; }
+.seg { font: 500 13px var(--font-mono); color: var(--text-btn); background: var(--surface-b); border: 1px solid var(--btn-border); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.seg[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
+.seg:focus-visible, input:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text-btn); cursor: pointer; }
+.chk input, input[type=range] { accent-color: var(--teal); }
+output { font: 500 13px var(--font-mono); color: var(--teal); min-width: 5ch; }
+.stage { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+.stage .row { padding: 14px 24px 12px; border-top: 1px solid var(--rule); width: max-content; display: grid; gap: 8px; }
+.stage .row:first-child { border-top: 0; }
+.stage .ttl { font: 500 12px var(--font-mono); letter-spacing: .08em; color: var(--muted); position: sticky; left: 24px; width: max-content; }
+.stage .ttl b { color: var(--text); font-weight: 500; }
+.stage .pair { display: flex; gap: 20px; align-items: flex-start; }
+canvas.px { image-rendering: pixelated; display: block; }
+.hint { font-size: 13px; color: var(--muted); }
+.matrix { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+table { border-collapse: collapse; width: max-content; }
+.matrix th, .matrix td { padding: 8px 14px; border-bottom: 1px solid var(--rule); vertical-align: middle; text-align: left; }
+.matrix th { font: 500 12px var(--font-mono); letter-spacing: .08em; color: var(--muted); }
+.matrix td.state { font-family: var(--font-ui); font-size: 16px; white-space: nowrap; }
+.matrix td.state small, .matrix td.tok { font: 400 11.5px var(--font-mono); color: var(--muted); letter-spacing: .02em; }
+.matrix td.state small { display: block; }
+.matrix td.tok { max-width: 330px; white-space: normal; line-height: 1.5; }
+.matrix tr:last-child td { border-bottom: 0; }
+.sheet { display: flex; flex-wrap: wrap; gap: 18px; padding: 20px; border: 1px solid var(--rule); border-radius: 12px;
+  background-color: #0c1218; background-image: linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%), linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%);
+  background-size: 12px 12px; background-position: 0 0, 6px 6px; }
+figure { margin: 0; display: grid; gap: 6px; justify-items: start; }
+figcaption { font: 400 12px var(--font-mono); color: var(--muted); }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.note { border-top: 2px solid var(--btn-border); padding-top: 12px; display: grid; gap: 6px; min-width: 0; align-content: start; }
+.note h3 { margin: 0; font: 600 15px var(--font-body); color: var(--text); }
+.note p, .note li { font-size: 14px; color: var(--text-caption); }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+code { font-family: var(--font-mono); font-size: .9em; color: var(--text-btn); background: var(--surface-b); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.ask { border: 1px solid var(--teal); border-radius: 12px; padding: 18px 20px; display: grid; gap: 8px; background: color-mix(in srgb, var(--teal) 6%, var(--bg)); }
+.ask h2 { color: var(--teal); }
+.ask ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--text-caption); }
+.ask b.rec { color: var(--teal); font-weight: 600; }
+.meter { font: 400 12px var(--font-mono); color: var(--muted); }
+.meter b { color: var(--teal); font-weight: 500; }
+table.m { border-collapse: collapse; font: 400 12px var(--font-mono); color: var(--text-caption); }
+table.m th, table.m td { padding: 4px 10px; border-bottom: 1px solid var(--rule); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.m th:first-child, table.m td:first-child { text-align: left; white-space: normal; }
+table.m th { color: var(--muted); font-weight: 400; }
+table.m.l { width: 100%; }
+table.m.l td, table.m.l th { text-align: left; white-space: normal; vertical-align: top; }
+.tbl { overflow-x: auto; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="lede">
+    <div class="eyebrow">UI 레시피 · 묶음 5 · 진행바 · 트랙</div>
+    <h1>진행바 · 현행 vs 레시피</h1>
+    <p class="meter">엔진 대조(현행 열 · Unity 리니어 RenderTexture 1540×130 · Play 없이 임시 Canvas): <span id="engine-line">값 0 · 3 · 50 · 100% × 바 6종 — 표본 51곳 최대 1/255 · 전 픽셀 평균 차 0.081 · 차 &gt; 3 인 픽셀 0개 (아래 「엔진 대조」 표)</span></p>
+    <p>지금 진행바는 공용 부품이 없습니다. 화면마다 단색 둥근 사각형 두 장(트랙 한 장, 채움 한 장)을 겹치고, 채움의 폭을 값에 맞춰 바꿉니다. 광택도 깊이감도 없는 평평한 띠입니다.
+      레시피판은 트랙을 안으로 파인 홈으로, 채움을 위쪽에 광택이 있는 막대로 굽고, 채움 끝에 밝은 앞머리를 붙입니다. 트랙색과 채움색은 지금처럼 게임이 입히므로 색을 바꾸는 기존 코드는 그대로 동작합니다. 바의 위치·크기·모서리 반경·색은 바꾸지 않습니다.</p>
+    <p>아래 값 슬라이더를 움직이면 이 페이지의 모든 바가 현행·레시피 함께 변합니다. <b>레시피 줄은 목업의 리니어 합성값입니다. 게임에 포팅했지만(2026-10-03) 엔진과 숫자로 대조한 것은 아직 현행 줄뿐입니다.</b></p>
+  </header>
+
+  <div class="sticky">
+    <div class="controls" role="group" aria-label="값">
+      <span class="lab">값</span>
+      <input id="t" type="range" min="0" max="100" step="0.5" value="62" aria-label="채움 값(퍼센트)" style="width:260px">
+      <output id="t-out">62%</output>
+      <button class="seg" data-t="0">0%</button>
+      <button class="seg" data-t="1">1%</button>
+      <button class="seg" data-t="3">3%</button>
+      <button class="seg" data-t="50">50%</button>
+      <button class="seg" data-t="100">100%</button>
+      <span class="lab">질감 세기</span>
+      <input id="k" type="range" min="0.5" max="2" step="0.25" value="1.25" aria-label="질감 세기">
+      <output id="k-out">×1.25</output>
+    </div>
+    <div class="controls" role="group" aria-label="레시피 제안 요소">
+      <span class="lab">레시피 제안 요소</span>
+      <label class="chk"><input type="checkbox" id="opt-groove" checked> ① 트랙 홈</label>
+      <label class="chk"><input type="checkbox" id="opt-gloss" checked> ② 채움 광택</label>
+      <label class="chk"><input type="checkbox" id="opt-head" checked> ③ 앞머리 빛</label>
+      <label class="chk"><input type="checkbox" id="opt-full" checked> ④ 가득 참 림</label>
+      <label class="chk"><input type="checkbox" id="opt-tick"> ⑤ 눈금(무기 레벨 · 타임라인)</label>
+      <label class="chk"><input type="checkbox" id="opt-cap" checked> ⑥ 짧은 채움 = 최소 캡(끄면 현행처럼 눌림)</label>
+    </div>
+  </div>
+
+  <section aria-labelledby="s1">
+    <h2 id="s1">화면 맥락 · 실제 크기와 3배 확대</h2>
+    <div class="stage">
+      <div class="row"><div class="ttl"><b>런 HUD 왼쪽 아래</b> · XP 바 212×16 · 피버 게이지 256×14 (런 내내 보임)</div>
+        <div class="pair"><figure><div id="hud-cur"></div><figcaption>현행</figcaption></figure><figure><div id="hud-rec"></div><figcaption>레시피 · 목업 리니어 합성값</figcaption></figure></div>
+        <div class="pair"><figure><div id="hud-cur-z"></div><figcaption>현행 · XP 패널 3배</figcaption></figure></div>
+        <div class="pair"><figure><div id="hud-rec-z"></div><figcaption>레시피 · XP 패널 3배</figcaption></figure></div></div>
+      <div class="row"><div class="ttl"><b>연구소 · 무기 패널 상세 카드</b> · 레벨 바 320×10 (값은 8칸 중 가까운 칸으로)</div>
+        <div class="pair"><figure><div id="arm-cur"></div><figcaption>현행</figcaption></figure><figure><div id="arm-rec"></div><figcaption>레시피 · 목업 리니어 합성값</figcaption></figure></div>
+        <div class="pair"><figure><div id="arm-cur-z"></div><figcaption>현행 · 3배</figcaption></figure></div>
+        <div class="pair"><figure><div id="arm-rec-z"></div><figcaption>레시피 · 3배</figcaption></figure></div></div>
+      <div class="row"><div class="ttl"><b>연구소 · 개요 카드</b> · 진행 띠 높이 6</div>
+        <div class="pair"><figure><div id="lab-cur"></div><figcaption>현행</figcaption></figure><figure><div id="lab-rec"></div><figcaption>레시피 · 목업 리니어 합성값</figcaption></figure></div>
+        <div class="pair"><figure><div id="lab-cur-z"></div><figcaption>현행 · 띠 3배</figcaption></figure><figure><div id="lab-rec-z"></div><figcaption>레시피 · 띠 3배</figcaption></figure></div></div>
+    </div>
+    <p class="hint">한 칸이 게임 픽셀 하나(1920×1080 기준)이고 게임과 같은 <b>리니어 블렌딩</b>으로 합성했습니다. 런 HUD 패널 바탕은 게임과 같은 구운 카드(묶음 3)입니다. 무기 카드와 개요 카드의 바탕은 단색 둥근 면으로 단순화했습니다(비교 대상은 바입니다).
+      런 화면 바탕색 #0c1621은 테마 토큰이 아니라 카드 목업이 쓰던 자리 표시 색입니다. 글자는 이 PC에 주아·Pretendard가 없으면 대체 글꼴로 나옵니다. 숫자는 예시입니다.</p>
+  </section>
+
+  <section aria-labelledby="s3">
+    <h2 id="s3">범위에 든 바 전부 · 높이별 색별</h2>
+    <p>색 토큰은 <code>Assets/Resources/UI/UiTheme.asset</code> 값입니다. 레시피 열은 같은 트랙색·채움색을 그대로 받습니다. 표의 바는 각자 놓이는 면의 색 위에 그렸습니다. 위의 값 슬라이더를 따라 움직입니다.</p>
+    <div class="matrix"><table>
+      <thead><tr><th>바</th><th>현행</th><th>레시피</th><th>게임이 입히는 색(현행·레시피 공통)</th></tr></thead>
+      <tbody id="matrix"></tbody>
+    </table></div>
+    <h2 style="font-size:17px">값 네 지점 · 짧은 채움이 어떻게 보이는가 (4배 확대 · 슬라이더와 무관)</h2>
+    <div class="matrix"><table>
+      <thead><tr><th>바</th><th>값</th><th>현행</th><th>레시피(지금 토글 그대로)</th></tr></thead>
+      <tbody id="shorts"></tbody>
+    </table></div>
+    <p class="hint">현행은 채움 폭이 모서리 반경의 두 배보다 짧으면 9-slice 경계가 눌려 납작한 타원이 됩니다(XP 바 1% = 폭 2.1). 「⑥ 최소 캡」을 켜면 레시피판은 그 구간에서 둥근 점 하나(폭 = 반경×2)를 그립니다. 값이 0이면 아무것도 그리지 않습니다.
+      최소 캡은 그림만 넓히고 값은 건드리지 않습니다. XP 바에서 둥근 점 하나는 3.8%에 해당하는 폭입니다.</p>
+  </section>
+
+  <section aria-labelledby="s4">
+    <h2 id="s4">레시피가 굽는 텍스처</h2>
+    <p>반경 5 · 4 · 3 세 벌입니다. 벌마다 레이어 6장(트랙 · 홈 그늘 · 턱 빛 · 채움 · 광택 · 가득 참 림)과 낱장 1장(앞머리 빛), 그리고 반경과 무관한 눈금 1장입니다. 전부 흰색·회색이나 검정 알파 바탕이고 색은 게임이 입힙니다.
+      텍스처 1칸은 게임 0.5단위이고 점선이 9-slice 경계입니다. 결(노이즈)은 owner 판정(카드·패널·탭에서 끔)을 따라 굽지 않습니다.</p>
+    <div class="sheet" id="sheet"></div>
+  </section>
+
+  <section aria-labelledby="s6">
+    <h2 id="s6">엔진 대조 · 현행 열</h2>
+    <p>현행 열이 게임과 같은지 Unity 에디터에서 숫자로 확인했습니다. Play 없이 임시 Canvas에 뷰가 쓰는 것과 같은 호출(<code>CanvasUi.NewImage(…, radius)</code> · <code>Fill</code> · <code>Pill</code> · <code>Rounded</code> · <code>Place</code>)로 바 6종을 값 0 · 3 · 50 · 100% 네 줄로 세우고, 리니어 RenderTexture(1540×130)로 읽었습니다. 바탕은 <code>RunHudPanelColor</code> 단색입니다. 이 페이지의 <code>?probe=1</code>이 같은 장면을 그립니다.</p>
+    <div class="tbl"><table class="m" id="engine-table">
+      <tr><th>표본(sRGB 0–255)</th><th>엔진 R,G,B</th><th>목업 현행 열 R,G,B</th><th>최대 채널 차</th></tr>
+      <!--ENGINE-->
+      <tr><td>배경 (5,5)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>XP 0% · 트랙 면 (215,18)</td><td>37, 37, 48</td><td>37, 37, 49</td><td>1</td></tr>
+      <tr><td>XP 0% · 트랙 왼쪽 위 모서리 (10,10)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>피버 0% · 트랙 면 (480,17)</td><td>45, 28, 22</td><td>45, 28, 22</td><td>0</td></tr>
+      <tr><td>무기 0% · 트랙 면 (810,17)</td><td>22, 34, 42</td><td>22, 34, 42</td><td>0</td></tr>
+      <tr><td>무기 0% · 트랙 왼쪽 끝 (498,13)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>개요 0% · 트랙 면 (1120,17)</td><td>28, 38, 53</td><td>28, 38, 53</td><td>0</td></tr>
+      <tr><td>도전과제 0% · 트랙 면 (1300,17)</td><td>28, 38, 53</td><td>28, 38, 53</td><td>0</td></tr>
+      <tr><td>타임라인 0% · 트랙 면 (1515,17)</td><td>27, 58, 112</td><td>27, 58, 112</td><td>0</td></tr>
+      <tr><td>XP 3% · 트랙 면 (215,48)</td><td>37, 37, 48</td><td>37, 37, 49</td><td>1</td></tr>
+      <tr><td>XP 3% · 트랙 왼쪽 위 모서리 (10,40)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>XP 3% · 채움 면 (15,48)</td><td>172, 65, 244</td><td>172, 65, 245</td><td>1</td></tr>
+      <tr><td>XP 3% · 채움 왼쪽 위 모서리 (12,42)</td><td>48, 38, 66</td><td>48, 38, 66</td><td>0</td></tr>
+      <tr><td>XP 3% · 채움 끝 안쪽 (18,48)</td><td>37, 37, 48</td><td>37, 37, 49</td><td>1</td></tr>
+      <tr><td>XP 3% · 채움 끝 바로 밖 (19,48)</td><td>37, 37, 48</td><td>37, 37, 49</td><td>1</td></tr>
+      <tr><td>XP 3% · 채움 끝 위 모서리 (18,42)</td><td>37, 37, 48</td><td>37, 37, 49</td><td>1</td></tr>
+      <tr><td>피버 3% · 채움 면 (237,47)</td><td>255, 106, 46</td><td>255, 106, 46</td><td>0</td></tr>
+      <tr><td>피버 3% · 채움 끝 안쪽 (241,47)</td><td>255, 106, 46</td><td>255, 106, 46</td><td>0</td></tr>
+      <tr><td>무기 3% · 채움 왼쪽 끝 (498,47)</td><td>85, 207, 182</td><td>85, 207, 182</td><td>0</td></tr>
+      <tr><td>무기 3% · 채움 끝 안쪽 (507,47)</td><td>85, 207, 182</td><td>85, 207, 182</td><td>0</td></tr>
+      <tr><td>개요 3% · 채움 끝 안쪽 (836,47)</td><td>84, 204, 180</td><td>85, 205, 180</td><td>1</td></tr>
+      <tr><td>도전과제 3% · 채움 끝 안쪽 (1143,47)</td><td>28, 38, 53</td><td>28, 38, 53</td><td>0</td></tr>
+      <tr><td>타임라인 3% · 채움 끝 안쪽 (1329,47)</td><td>57, 125, 236</td><td>56, 125, 236</td><td>1</td></tr>
+      <tr><td>XP 50% · 트랙 면 (215,78)</td><td>37, 37, 48</td><td>37, 37, 49</td><td>1</td></tr>
+      <tr><td>XP 50% · 트랙 왼쪽 위 모서리 (10,70)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>XP 50% · 채움 면 (15,78)</td><td>172, 65, 244</td><td>172, 65, 245</td><td>1</td></tr>
+      <tr><td>XP 50% · 채움 왼쪽 위 모서리 (12,72)</td><td>37, 37, 48</td><td>37, 37, 49</td><td>1</td></tr>
+      <tr><td>XP 50% · 채움 끝 안쪽 (115,78)</td><td>172, 65, 244</td><td>172, 65, 245</td><td>1</td></tr>
+      <tr><td>XP 50% · 채움 끝 바로 밖 (116,78)</td><td>37, 37, 48</td><td>37, 37, 49</td><td>1</td></tr>
+      <tr><td>XP 50% · 채움 끝 위 모서리 (115,72)</td><td>37, 37, 48</td><td>37, 37, 49</td><td>1</td></tr>
+      <tr><td>피버 50% · 채움 면 (237,77)</td><td>255, 106, 46</td><td>255, 106, 46</td><td>0</td></tr>
+      <tr><td>피버 50% · 채움 끝 안쪽 (359,77)</td><td>255, 106, 46</td><td>255, 106, 46</td><td>0</td></tr>
+      <tr><td>무기 50% · 채움 왼쪽 끝 (498,77)</td><td>85, 207, 182</td><td>85, 207, 182</td><td>0</td></tr>
+      <tr><td>무기 50% · 채움 끝 안쪽 (657,77)</td><td>85, 207, 182</td><td>85, 207, 182</td><td>0</td></tr>
+      <tr><td>개요 50% · 채움 끝 안쪽 (977,77)</td><td>84, 204, 180</td><td>85, 205, 180</td><td>1</td></tr>
+      <tr><td>도전과제 50% · 채움 끝 안쪽 (1225,77)</td><td>86, 209, 184</td><td>86, 209, 184</td><td>0</td></tr>
+      <tr><td>타임라인 50% · 채움 끝 안쪽 (1423,77)</td><td>57, 125, 236</td><td>56, 125, 236</td><td>1</td></tr>
+      <tr><td>XP 100% · 트랙 면 (215,108)</td><td>172, 65, 244</td><td>172, 65, 245</td><td>1</td></tr>
+      <tr><td>XP 100% · 트랙 왼쪽 위 모서리 (10,100)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>XP 100% · 채움 면 (15,108)</td><td>172, 65, 244</td><td>172, 65, 245</td><td>1</td></tr>
+      <tr><td>XP 100% · 채움 왼쪽 위 모서리 (12,102)</td><td>37, 37, 48</td><td>37, 37, 49</td><td>1</td></tr>
+      <tr><td>XP 100% · 채움 끝 안쪽 (219,108)</td><td>172, 65, 244</td><td>172, 65, 245</td><td>1</td></tr>
+      <tr><td>XP 100% · 채움 끝 바로 밖 (219,108)</td><td>172, 65, 244</td><td>172, 65, 245</td><td>1</td></tr>
+      <tr><td>XP 100% · 채움 끝 위 모서리 (219,102)</td><td>37, 37, 48</td><td>37, 37, 49</td><td>1</td></tr>
+      <tr><td>피버 100% · 채움 면 (237,107)</td><td>255, 106, 46</td><td>255, 106, 46</td><td>0</td></tr>
+      <tr><td>피버 100% · 채움 끝 안쪽 (485,107)</td><td>255, 106, 46</td><td>255, 106, 46</td><td>0</td></tr>
+      <tr><td>무기 100% · 채움 왼쪽 끝 (498,107)</td><td>85, 207, 182</td><td>85, 207, 182</td><td>0</td></tr>
+      <tr><td>무기 100% · 채움 끝 안쪽 (817,107)</td><td>85, 207, 182</td><td>85, 207, 182</td><td>0</td></tr>
+      <tr><td>개요 100% · 채움 끝 안쪽 (1127,107)</td><td>84, 204, 180</td><td>85, 205, 180</td><td>1</td></tr>
+      <tr><td>도전과제 100% · 채움 끝 안쪽 (1313,107)</td><td>86, 209, 184</td><td>86, 209, 184</td><td>0</td></tr>
+      <tr><td>타임라인 100% · 채움 끝 안쪽 (1523,107)</td><td>57, 125, 236</td><td>56, 125, 236</td><td>1</td></tr>
+      <tr><td>전 픽셀 1540×130</td><td colspan="2">평균 차 0.081 · 차 &gt; 3 인 픽셀 0개 · 차 &gt; 8 인 픽셀 0개 · 최대 1</td><td>표본 51곳 최대 1</td></tr>
+      <!--/ENGINE-->
+    </table></div>
+    <p class="hint" id="engine-hint">3% 줄은 채움 폭(6.2)이 모서리 반경의 두 배(8)보다 짧아 9-slice 경계가 눌리는 구간인데, 이 구간도 엔진과 1/255 이내로 같습니다. 레시피 열은 포팅 뒤 엔진 캡처 대조를 아직 하지 않았습니다. 레시피 열의 합성기는 현행 열과 같은 코드(같은 9-slice 표본 · 같은 리니어 블렌딩)입니다.</p>
+  </section>
+
+  <section aria-labelledby="s7">
+    <h2 id="s7">포팅하면 바뀌는 것</h2>
+    <div class="tbl"><table class="m l">
+      <tr><th>구분</th><th>자리(심볼)</th><th>크기 · 반경</th><th>판정과 이유</th></tr>
+      <tr><td>들어감 1</td><td>런 HUD XP 바 <code>RunHudView.BuildLevelPanel</code></td><td>212×16 r4 · 채움 안쪽 2 들임</td><td>런 내내 보임. 반경 4 벌</td></tr>
+      <tr><td>들어감 2</td><td>런 HUD 피버 게이지 <code>RunHudView.BuildFeverPanel</code></td><td>256×14 r4 · 채움 안쪽 2 들임</td><td>런 내내 보임. 반경 4 벌</td></tr>
+      <tr><td>들어감 3</td><td>무기 레벨 바 <code>ArmamentWeaponView.BuildCard</code></td><td>≤320×10 r5(알약)</td><td>반경 5 벌. 트랙색이 카드 면과 같은 토큰이라 지금은 트랙이 거의 안 보임 — 홈 그늘이 생기면 트랙이 드러남</td></tr>
+      <tr><td>들어감 4</td><td>연구소 개요 카드 진행 띠 <code>LabShellView.CardView</code></td><td>카드 폭−40 × 6 r3(알약)</td><td>반경 3 벌</td></tr>
+      <tr><td>들어감 5</td><td>도전과제 진행 바 <code>AchievementsOverlayView.BuildCard</code></td><td>176×10 · 트랙 r5 · 채움 r4</td><td>반경 5 벌. 지금은 채움(r4)이 트랙(r5)과 반경이 달라 100%에서 모서리가 어긋남 → 둘 다 r5로 맞춤</td></tr>
+      <tr><td>들어감 6</td><td>장비 타임라인 트랙 <code>EquipmentView.TimelinePanel</code></td><td>3구간 × 6 r3(알약)</td><td>반경 3 벌. 구간 3개가 각자 트랙+채움. 마커 점·발광은 그대로</td></tr>
+      <tr><td>제외 1</td><td>설정 슬라이더 <code>SettingsView.BuildSlider</code></td><td>트랙 9 r4 + 손잡이 27×36 r13</td><td>상호작용 부품. 이미 <code>Recess</code>(파인 홈)가 있고 손잡이는 묶음 3에서도 제외. 채움이 손잡이 밑으로 27만큼 늘 깔려 있어 「짧은 채움」도 없음</td></tr>
+      <tr><td>제외 2</td><td>장비 세대 교체 틱 트랙 <code>EquipmentView.GenerationSwapLayer</code></td><td>높이 4 r2</td><td>반경 2는 구울 벌(최소 3)보다 작음. 1초 남짓 연출 중에만 보임</td></tr>
+      <tr><td>제외 3</td><td>스킬트리 서랍 브랜치 바 <code>LabNodePanelsView.BranchRow</code></td><td>높이 3 · 직각</td><td>3단위 = 6텍셀이라 홈·광택을 넣을 자리가 없음</td></tr>
+      <tr><td>제외 4</td><td>노드 구매 홀드 채움 <code>LabNodePanelsView</code> <code>HoldFill</code></td><td>버튼 폭 × 24 r5 · 반투명</td><td>트랙이 없고 버튼(묶음 1) 위에 깔리는 반투명 덮개. 문법이 다름</td></tr>
+      <tr><td>제외 5</td><td>스크롤바 5곳(젬 합성 · 연구소 패널/서랍 · 도전과제 · 소켓)</td><td>폭 18</td><td>진행 표시가 아니라 스크롤. 손잡이 길이가 내용에 따라 변해 따로 다룰 묶음</td></tr>
+      <tr><td>제외 6</td><td>버프 큐 밑줄 <code>RunFxView</code> <code>Underline</code></td><td>높이 3 · 직각</td><td>길이가 변하지 않는 강조선</td></tr>
+      <tr><td>범위 밖</td><td>IMGUI 홀드 버튼 채움 <code>DrawSkillTreeHoldButtonVisual</code> / 런 필드의 노드 HP 바(<code>SpriteRenderer</code> · 빨강→초록)</td><td>—</td><td>레시피는 Canvas <code>Image</code> 대상. IMGUI와 월드 스프라이트는 이 묶음 밖(런 HUD의 IMGUI 바 두 개는 이미 삭제되어 Canvas 판만 남음)</td></tr>
+    </table></div>
+    <div class="notes">
+      <div class="note"><h3>그대로 두는 것</h3>
+        <ul><li>바의 위치 · 폭 · 높이 · 모서리 반경 · 채움 들임(HUD 2)</li>
+          <li>트랙색 · 채움색 토큰과, 호출부가 색을 바꾸는 코드(도전과제 달성/잠김 · 장비 시대색). 신규 색 0</li>
+          <li>「채움 rect 폭 = 값」 — 호출부가 폭을 정하는 코드. 값 계산 · 글자</li>
+          <li>값 변화는 지금처럼 즉시(보간 없음). 장비 타임라인의 기존 보간은 그대로</li></ul></div>
+      <div class="note"><h3>바뀌는 것</h3>
+        <ul><li>트랙·채움이 구운 그림을 씁니다(2텍셀/단위라 가장자리가 더 또렷). 켠 요소마다 레이어가 하나씩 늘어납니다</li>
+          <li>채움 그림은 호출부가 폭을 바꾸는 rect의 자식으로 붙습니다. 앞머리 빛은 그 rect의 오른쪽 끝에 고정됩니다</li>
+          <li>작은 컴포넌트 하나가 폭이 바뀔 때마다 판정합니다: 최소 캡 · 앞머리 빛 세기 · 가득 참(묶음 3의 모서리 장식 판정과 같은 방식)</li>
+          <li>도전과제 채움 반경 4 → 5</li></ul></div>
+      <div class="note"><h3>정본과 다른 점(참고)</h3>
+        <ul><li><code>ui-prototype.html</code>의 <code>.progress-track</code>은 #1e2d3a 알약 + 넘침 잘라내기입니다. 구현 트랙은 <code>HairlineColor</code>(#1b2836)이고 무기 레벨 바만 <code>SurfaceRaisedTopColor</code>입니다. 잘라내기가 없어 짧은 채움이 눌립니다</li>
+          <li>정본의 채움은 폭이 0.3초에 걸쳐 변합니다. 구현은 즉시 바뀝니다</li>
+          <li>정본 피버 게이지는 높이 12 알약 + 주황 1px 테두리 + 채움 바깥 발광입니다. 구현은 높이 14 · 반경 4 · 테두리와 발광 없음 · 채움 2 들임이고 트랙색도 다릅니다(#35180f ↔ #2e1f14)</li>
+          <li>정본에는 런 HUD XP 바가 없습니다(구현에만 있음)</li>
+          <li>2026-10-03 포팅과 함께 정본의 진행바 절(<code>.progress-track</code> · 피버 게이지 · 런 HUD XP 바)을 구현에 맞게 고쳤습니다</li></ul></div>
+    </div>
+  </section>
+
+  <section class="ask" aria-labelledby="s8">
+    <h2 id="s8">owner 판정 (2026-10-03)</h2>
+    <p>원문: <code>1a 2a 3a 4a 5a 6a</code> — 여섯 문항 모두 추천안입니다. 질감 세기는 앞 묶음과 같은 ×1.25입니다.</p>
+    <ol id="asks">
+      <li><b>트랙을 파인 홈으로(①)</b> — <b class="rec">켬</b>. 트랙 안쪽 위에 그늘, 아래 턱에 옅은 빛</li>
+      <li><b>채움 광택(②)</b> — <b class="rec">켬</b>. 채움 위쪽에 밝은 띠, 아래로 갈수록 살짝 어둡게</li>
+      <li><b>채움 끝 표시(③④)</b> — <b class="rec">둘 다 켬</b>. 채움 끝에 밝은 앞머리 빛, 가득 차면 앞머리 대신 둘레 전체에 밝은 림</li>
+      <li><b>아주 짧은 채움(⑥)</b> — <b class="rec">둥근 점 하나로</b>. 0보다 크고 반경×2보다 짧은 채움은 그림만 반경×2로 그립니다. 값(rect 폭)은 그대로이고, 값이 0이면 그리지 않습니다</li>
+      <li><b>눈금(⑤)</b> — <b class="rec">안 함</b>. 위 체크박스는 비교용으로만 남겼고 게임에는 눈금 그림이 없습니다</li>
+      <li><b>범위</b> — <b class="rec">표의 6곳</b>. 런 HUD XP 바 · 피버 게이지 · 무기 레벨 바 · 연구소 개요 카드 진행 띠 · 도전과제 진행 바(채움 반경 4→5) · 장비 타임라인 트랙</li>
+    </ol>
+    <p>게임 구현: <code>CanvasUi.NewGaugeTrack</code> · <code>NewGaugeFill</code> + 판정 컴포넌트 <code>RecipeGaugeFit</code>(최소 캡 · 앞머리 빛 세기 · 가득 참). 굽는 쪽: recipe-art <code>ui_gauge</code> 드로어(v0.8.0 · 반경 5 · 4 · 3 · 눈금 없음).</p>
+  </section>
+</div>
+
+<script src="ui-recipe-card-bake.js"></script>
+<script src="ui-recipe-progress-bake.js"></script>
+<script>
+(function () {
+  'use strict';
+  // ── 게임 토큰 — Assets/Resources/UI/UiTheme.asset 의 값 그대로(0..1 실수 · RGBA). 신규 색 0.
+  //    검증 스크립트가 이 블록을 UiTheme.asset 과 대조한다(드리프트면 실패) — 손으로 고치지 말 것.
+  var THEME = /*THEME*/{
+    RunHudPanelColor: [0.039, 0.063, 0.09, 1],
+    RunLevelPanelBorderColor: [0.54, 0.3, 0.94, 0.8],
+    RunLevelBadgeColor: [0.42, 0.08, 0.78, 0.98],
+    RunLevelBadgeBorderColor: [0.85, 0.68, 1, 0.9],
+    RunXpBarTrackColor: [0.15, 0.15, 0.2, 0.95],
+    RunXpBarFillColor: [0.69, 0.26, 0.98, 0.95],
+    RunFeverPanelColor: [0.08, 0.05, 0.03, 0.92],
+    RunFeverBarTrackColor: [0.18, 0.12, 0.08, 0.96],
+    FeverThemeColor: [1, 0.42, 0.18, 1],
+    SurfaceRaisedTopColor: [0.086, 0.125, 0.173, 1],
+    SurfaceRaisedBottomColor: [0.055, 0.086, 0.125, 1],
+    HairlineColor: [0.106, 0.157, 0.212, 1],
+    ButtonBorderColor: [0.149, 0.22, 0.29, 1],
+    MenuCursorColor: [0.34, 0.82, 0.72, 1],
+    AchievementAccentColor: [0.34, 0.82, 0.72, 1],
+    AchievementLockedColor: [0.44, 0.48, 0.56, 1],
+    OverlayPanelColor: [0.039, 0.063, 0.09, 1],
+    OverlayShellPanelColor: [0.06, 0.08, 0.14, 0.98],
+    TextTitleColor: [0.918, 0.953, 0.949, 1],
+    TextNumColor: [0.812, 0.855, 0.902, 1],
+    TextBtnColor: [0.788, 0.839, 0.886, 1],
+    TextCaptionColor: [0.725, 0.776, 0.827, 1],
+    kGoldenNodeTint: [0.96, 0.91, 0.35, 1],
+    EquipmentEraLegacyColor: [0.61, 0.64, 0.69, 0.95],
+    EquipmentEraMidColor: [0.23, 0.51, 0.96, 0.95],
+    EquipmentEraCurrentColor: [0.96, 0.62, 0.04, 0.95]
+  }/*END*/;
+  var FIELD_BG = [12 / 255, 22 / 255, 33 / 255, 1];   // 런 화면 바탕 자리 표시 #0c1621(카드 목업 --field-surface · 토큰 아님)
+  function tk(name, alpha) { var c = THEME[name]; return [c[0], c[1], c[2], alpha == null ? c[3] : alpha]; }
+  function mul(c, k, alpha) { return [c[0] * k, c[1] * k, c[2] * k, alpha]; }
+  var WHITE = [1, 1, 1, 1];
+  function hexOf(c) { return '#' + [0, 1, 2].map(function (i) { return ('0' + Math.round(c[i] * 255).toString(16)).slice(-2); }).join(''); }
+
+  // ── 엔진이 색을 다루는 방식(묶음 4 가 엔진 캡처로 확인한 3가지 — 현행·레시피 공통. 목업 = 게임):
+  //   ① 틴트(Image.color)는 **리니어에서** 텍스처에 곱해진다.
+  //   ② uGUI 는 색을 Color32 로 만든 뒤 **리니어 8비트로 반올림**해 정점에 싣는다 ⇒ 아주 어두운 색은 계단이 굵다(#0a1017 → 화면 #0d0d16).
+  //   ③ 텍스처 없는 사각형은 **픽셀 중심이 안에 든 칸만** 칠한다(안티에일리어싱 없음). 스프라이트 쿼드의 가장자리도 같다.
+  var LIN = new Float32Array(256);
+  for (var li = 0; li < 256; li++) { var lc = li / 255; LIN[li] = lc <= 0.04045 ? lc / 12.92 : Math.pow((lc + 0.055) / 1.055, 2.4); }
+  function toSrgb8(l) { var c = l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(l, 1 / 2.4) - 0.055; return Math.round(Math.max(0, Math.min(1, c)) * 255); }
+  var QUANT = true;   // ?quant=0 으로 끄면 양자화 없는 대조 실행
+  /** 색(0..1 sRGB RGBA) → 정점에 실리는 리니어 RGB + 알파(Color32 반올림) */
+  function tintLin(c) {
+    var o = [0, 1, 2].map(function (i) { var b = Math.round(Math.max(0, Math.min(1, c[i])) * 255); return QUANT ? Math.round(LIN[b] * 255) / 255 : LIN[b]; });
+    o.push(Math.round((c[3] == null ? 1 : c[3]) * 255) / 255);
+    return o;
+  }
+  function shownCss(c) { var t = tintLin(c); return 'rgb(' + toSrgb8(t[0]) + ',' + toSrgb8(t[1]) + ',' + toSrgb8(t[2]) + ')'; }
+
+  // ═════ 실수 버퍼 합성기 — 리니어 RGB 를 Float32 로 쌓고 마지막에 한 번만 8비트로 내린다 ═════
+  function Buf(w, h, bg) {
+    var n = w * h, t = tintLin(bg);
+    this.w = w; this.h = h; this.r = new Float32Array(n).fill(t[0]); this.g = new Float32Array(n).fill(t[1]); this.b = new Float32Array(n).fill(t[2]);
+  }
+  Buf.prototype.toCanvas = function (zoom) {
+    var c = document.createElement('canvas'); c.width = this.w; c.height = this.h;
+    var x = c.getContext('2d'), img = x.createImageData(this.w, this.h), o = img.data;
+    for (var k = 0, j = 0; k < this.w * this.h; k++, j += 4) { o[j] = toSrgb8(this.r[k]); o[j + 1] = toSrgb8(this.g[k]); o[j + 2] = toSrgb8(this.b[k]); o[j + 3] = 255; }
+    x.putImageData(img, 0, 0);
+    c.className = 'px'; c.style.width = (this.w * (zoom || 1)) + 'px'; c.style.height = (this.h * (zoom || 1)) + 'px';
+    return c;
+  };
+  /** 굽기 결과(straight RGBA 8비트 · 위→아래)의 한 칸을 표본용 텍스처로. GPU 처럼 RGB 는 리니어로 풀어 두고 알파는 따로. */
+  function makeTex(data, stride, sx, w, h) {
+    var lin = new Float32Array(w * h * 3), al = new Float32Array(w * h);
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+      var si = (y * stride + sx + x) * 4, di = y * w + x;
+      lin[di * 3] = LIN[data[si]]; lin[di * 3 + 1] = LIN[data[si + 1]]; lin[di * 3 + 2] = LIN[data[si + 2]]; al[di] = data[si + 3] / 255;
+    }
+    return { W: w, H: h, lin: lin, a: al, raw: { data: data, stride: stride, sx: sx } };
+  }
+  // 9-slice 한 축: 목적 좌표 u(0..D) → 텍셀 좌표. bA/bB = 목적 쪽 경계(px) · tA/tB = 텍셀 경계 · n = 텍셀 길이
+  function axis(u, D, bA, bB, tA, tB, n) {
+    if (bA > 0 && u < bA) return u / bA * tA;
+    if (bB > 0 && u > D - bB) return n - (D - u) / bB * tB;
+    var mid = D - bA - bB; return mid <= 0 ? tA : tA + (u - bA) / mid * (n - tA - tB);
+  }
+  /**
+   * Unity Image.Type.Sliced 한 장을 버퍼에 얹는다(SrcAlpha · OneMinusSrcAlpha · 리니어).
+   * @param upt 텍셀 하나가 차지하는 목적 px(절차식 1 · 레시피 1/TX)   @param bt 텍셀 경계 [L, T, R, B]
+   * 경계 합이 목적 크기를 넘으면 Unity 처럼 그 축의 두 경계를 같은 비율로 눌러 담는다. 쿼드 가장자리는 픽셀 중심 판정.
+   */
+  function blit(buf, tex, dx, dy, dw, dh, upt, bt, color) {
+    if (dw <= 0 || dh <= 0) return;
+    var t = tintLin(color), alpha = t[3];
+    var bL = bt[0] * upt, bT = bt[1] * upt, bR = bt[2] * upt, bB = bt[3] * upt, s;
+    if (bL + bR > dw) { s = dw / (bL + bR); bL *= s; bR *= s; }
+    if (bT + bB > dh) { s = dh / (bT + bB); bT *= s; bB *= s; }
+    var xa = Math.max(0, Math.ceil(dx - 0.5)), xb = Math.min(buf.w, Math.ceil(dx + dw - 0.5));
+    var ya = Math.max(0, Math.ceil(dy - 0.5)), yb = Math.min(buf.h, Math.ceil(dy + dh - 0.5));
+    if (xb <= xa || yb <= ya) return;
+    var W = tex.W, H = tex.H, txs = new Float32Array(xb - xa), x, y;
+    for (x = xa; x < xb; x++) txs[x - xa] = axis(x + 0.5 - dx, dw, bL, bR, bt[0], bt[2], W);
+    for (y = ya; y < yb; y++) {
+      var fy = Math.min(Math.max(axis(y + 0.5 - dy, dh, bT, bB, bt[1], bt[3], H) - 0.5, 0), H - 1);
+      var iy = Math.min(Math.floor(fy), Math.max(0, H - 2)), wy = fy - iy, iy1 = Math.min(iy + 1, H - 1);
+      for (x = xa; x < xb; x++) {
+        var fx = Math.min(Math.max(txs[x - xa] - 0.5, 0), W - 1);
+        var ix = Math.min(Math.floor(fx), Math.max(0, W - 2)), wx = fx - ix, ix1 = Math.min(ix + 1, W - 1);
+        var p00 = iy * W + ix, p10 = iy * W + ix1, p01 = iy1 * W + ix, p11 = iy1 * W + ix1;
+        var w00 = (1 - wx) * (1 - wy), w10 = wx * (1 - wy), w01 = (1 - wx) * wy, w11 = wx * wy;
+        var a = (tex.a[p00] * w00 + tex.a[p10] * w10 + tex.a[p01] * w01 + tex.a[p11] * w11) * alpha;
+        if (a <= 0) continue;
+        var L = tex.lin, ia = 1 - a, q = y * buf.w + x;
+        buf.r[q] = (L[p00 * 3] * w00 + L[p10 * 3] * w10 + L[p01 * 3] * w01 + L[p11 * 3] * w11) * t[0] * a + buf.r[q] * ia;
+        buf.g[q] = (L[p00 * 3 + 1] * w00 + L[p10 * 3 + 1] * w10 + L[p01 * 3 + 1] * w01 + L[p11 * 3 + 1] * w11) * t[1] * a + buf.g[q] * ia;
+        buf.b[q] = (L[p00 * 3 + 2] * w00 + L[p10 * 3 + 2] * w10 + L[p01 * 3 + 2] * w01 + L[p11 * 3 + 2] * w11) * t[2] * a + buf.b[q] * ia;
+      }
+    }
+  }
+
+  // ═════ 현행 = CanvasUi 절차식(텍스처를 C# 과 같은 식으로 만든다) ═════
+  //   RoundedFill(r): (2r+2)² 흰색 · 알파 = CornerAlpha · 네 변 경계 r · ppu 100(1 텍셀 = 1 단위)
+  //   RoundedRing(r, t): 같은 크기 · 알파 = clamp(outer − inner(t))
+  function cornerAlpha(x, y, size, radius, inset) {
+    inset = inset || 0;
+    var px = x + 0.5, py = y + 0.5, min = inset, max = size - inset;
+    if (px < min || py < min || px > max || py > max) return 0;
+    var r = Math.max(0, radius - inset);
+    var cx = px < min + r ? min + r : (px > max - r ? max - r : px);
+    var cy = py < min + r ? min + r : (py > max - r ? max - r : py);
+    return Math.max(0, Math.min(1, r - Math.hypot(px - cx, py - cy) + 0.5));
+  }
+  var procCache = {};
+  function procTex(radius, ringT) {
+    radius = Math.max(2, Math.min(64, radius));
+    var key = radius + ':' + (ringT || 0); if (procCache[key]) return procCache[key];
+    var size = radius * 2 + 2, d = new Uint8Array(size * size * 4), th = ringT ? Math.max(1, Math.min(ringT, radius)) : 0;
+    for (var y = 0; y < size; y++) for (var x = 0; x < size; x++) {
+      var a = cornerAlpha(x, y, size, radius); if (ringT) a = Math.max(0, Math.min(1, a - cornerAlpha(x, y, size, radius, th)));
+      var o = (y * size + x) * 4; d[o] = d[o + 1] = d[o + 2] = 255; d[o + 3] = Math.round(a * 255);
+    }
+    var t = makeTex(d, size, 0, size, size); t.b = [radius, radius, radius, radius];
+    return (procCache[key] = t);
+  }
+  function fillProc(buf, x, y, w, h, r, color) { var t = procTex(r); blit(buf, t, x, y, w, h, 1, t.b, color); }
+  function ringProc(buf, x, y, w, h, r, th, color) { var t = procTex(r, th); blit(buf, t, x, y, w, h, 1, t.b, color); }
+
+  // ═════ 레시피 = html/ui-recipe-progress-bake.js 를 잘라 틴트 → 9-slice ═════
+  var P = window.UiProgressRecipe, TX = P.TX, PAD = P.PAD, K = 1.25;
+  var OPT = { groove: true, gloss: true, head: true, full: true, tick: false, cap: true };   // 기본값 = owner 판정(2026-10-03 `1a 2a 3a 4a 5a 6a`) = 게임
+  var recCache = {};
+  function recLayers(radius) {
+    var key = radius + ':' + K; if (recCache[key]) return recCache[key];
+    var r = P.bakeRecipes(radius, K), sh = r.gauge, res = { b: sh.border, layer: {} };
+    P.LAYERS.forEach(function (n, l) { res.layer[n] = makeTex(sh.data, sh.W, l * sh.cellW, sh.cellW, sh.H); });
+    res.layer.head = makeTex(r.head.data, r.head.W, 0, r.head.W, r.head.H); res.headB = r.head.border;
+    res.layer.tick = makeTex(r.tick.data, r.tick.W, 0, r.tick.W, r.tick.H);
+    return (recCache[key] = res);
+  }
+
+  // ── 런 HUD 패널 바탕 = 구운 카드(묶음 3 · CanvasUi.ElevateCard) — ui-recipe-card-bake.js 를 읽기만 한다. 순서는 카드 목업 drawRecipe 와 같다.
+  var C = window.UiCardRecipe, cardCache = {};
+  function cardLayers(radius) {
+    if (cardCache[radius]) return cardCache[radius];
+    var sh = C.bakeSheet(radius, 1.25, { rim: true, bevel: true }), res = { borders: sh.borders, layer: {} };
+    C.LAYERS.forEach(function (n, l) { res.layer[n] = makeTex(sh.data, sh.W, l * sh.cellW, sh.cellW, sh.H); });
+    var rp = C.bakeRamp(radius, 1.25); res.layer.ramp = makeTex(rp.data, rp.W, 0, rp.W, rp.H); res.rampB = rp.borderLR;
+    return (cardCache[radius] = res);
+  }
+  function drawCard(buf, x, y, w, h, r, fill, ring, ringTh) {
+    var L = cardLayers(r), cp = C.PAD, u = 1 / C.TX, dx = x - cp, dy = y - cp, dw = w + 2 * cp, dh = h + 2 * cp;
+    function put(n, c) { var b = L.borders[n]; blit(buf, L.layer[n], dx, dy, dw, dh, u, [b, b, b, b], c); }
+    put('shadow', WHITE); put('face', fill);
+    blit(buf, L.layer.ramp, x, y, w, h, u, [L.rampB, 0, L.rampB, 0], tk('SurfaceRaisedTopColor'));
+    put('sheen', tk('TextBtnColor'));
+    if (Math.min(w, h) >= 2 * (r + C.CORNER_RUN)) put('corner', tk('TextBtnColor', 0.35));
+    if (ring) ringProc(buf, x, y, w, h, r, ringTh, ring);
+  }
+
+  // ═════ 바 정의 — 호출부 값 그대로(주석 = 심볼) ═════
+  //   w·h = 트랙 rect · r = 트랙 반경 · fr = 채움 반경(없으면 r) · inset = 채움 들임 · hideZero = 값 0 에서 채움 GameObject 끔
+  var ERA = [['EquipmentEraLegacyColor', 0, 2 / 7], ['EquipmentEraMidColor', 2 / 7, 5 / 7], ['EquipmentEraCurrentColor', 5 / 7, 1]];
+  var BARS = /*BARS*/{
+    xp: { name: '런 HUD · XP 바', sub: 'RunHudView.BuildLevelPanel · 212×16 r4 · 들임 2', w: 212, h: 16, r: 4, inset: 2, track: 'RunXpBarTrackColor', fill: 'RunXpBarFillColor', surface: 'RunHudPanelColor' },
+    fever: { name: '런 HUD · 피버 게이지', sub: 'RunHudView.BuildFeverPanel · 256×14 r4 · 들임 2', w: 256, h: 14, r: 4, inset: 2, track: 'RunFeverBarTrackColor', fill: 'FeverThemeColor', surface: 'RunFeverPanelColor' },
+    arm: { name: '무기 레벨 바', sub: 'ArmamentWeaponView · 320×10 r5(알약)', w: 320, h: 10, r: 5, inset: 0, hideZero: true, steps: 8, track: 'SurfaceRaisedTopColor', fill: 'MenuCursorColor', surface: 'SurfaceRaisedTopColor' },
+    lab: { name: '연구소 개요 카드 진행 띠', sub: 'LabShellView.CardView · 폭 카드−40 × 6 r3(알약)', w: 300, h: 6, r: 3, inset: 0, track: 'HairlineColor', fill: 'MenuCursorColor', surface: 'OverlayShellPanelColor' },
+    ach: { name: '도전과제 · 진행 중(잠김)', sub: 'AchievementsOverlayView · 176×10 · 트랙 r5 · 채움 r4', w: 176, h: 10, r: 5, fr: 4, inset: 0, track: 'HairlineColor', fill: 'AchievementLockedColor', surface: 'SurfaceRaisedBottomColor' },
+    achDone: { name: '도전과제 · 달성', sub: '달성하면 채움색이 청록 · 값 100% 고정', w: 176, h: 10, r: 5, fr: 4, inset: 0, track: 'HairlineColor', fill: 'AchievementAccentColor', surface: 'SurfaceRaisedTopColor', forceT: 1 },
+    tl: { name: '장비 타임라인', sub: 'EquipmentView.TimelinePanel · 3구간(2/7 · 3/7 · 2/7) × 6 r3', w: 420, h: 6, r: 3, inset: 0, hideZero: true, segs: ERA, steps: 7, surface: 'OverlayShellPanelColor' }
+  }/*END*/;
+  function segsOf(bar, t) {   // [{x, w, track, fill, fw}] — 타임라인은 구간마다 트랙+채움(채움 끝 = min(전체 채움 끝, 구간 끝))
+    if (!bar.segs) return [{ x: 0, w: bar.w, track: tk(bar.track), fill: tk(bar.fill), fw: (bar.w - 2 * bar.inset) * t }];
+    return bar.segs.map(function (s) {
+      var era = tk(s[0]), x0 = bar.w * s[1], x1 = bar.w * s[2];
+      return { x: x0, w: x1 - x0, track: mul(era, 0.48, 0.9), fill: era, fw: Math.min(bar.w * t, x1) - x0 };
+    });
+  }
+  /** 바 하나를 (x, y) 에 그린다. kind = 'cur' | 'rec' · t = 0..1 */
+  function drawBar(buf, kind, bar, x, y, t) {
+    if (bar.forceT != null) t = bar.forceT;
+    var fh = bar.h - 2 * bar.inset;
+    segsOf(bar, t).forEach(function (sg) {
+      var sx = x + sg.x, fx = sx + bar.inset, fy = y + bar.inset, fw = sg.fw, maxW = sg.w - 2 * bar.inset;
+      var show = fw > 0 && !(bar.hideZero && t <= 0);
+      var rr = P.recipeRadius(bar.r);
+      if (kind === 'cur' || !rr) {
+        fillProc(buf, sx, y, sg.w, bar.h, bar.r, sg.track);
+        if (show) fillProc(buf, fx, fy, fw, fh, bar.fr || bar.r, sg.fill);
+        return;
+      }
+      // 레시피 — 트랙: track → groove → lip / 채움: fill → gloss → (full | head) / 눈금은 맨 위
+      var R = recLayers(rr), u = 1 / TX, b = [R.b, R.b, R.b, R.b];
+      var putT = function (n, c) { blit(buf, R.layer[n], sx - PAD, y - PAD, sg.w + 2 * PAD, bar.h + 2 * PAD, u, b, c); };
+      putT('track', sg.track);
+      if (OPT.groove) { putT('groove', WHITE); putT('lip', tk('TextBtnColor')); }
+      if (!show) return;
+      var rf = Math.min(rr, Math.floor(fh / 2)), F = rf === rr ? R : recLayers(P.recipeRadius(rf)), fb = [F.b, F.b, F.b, F.b];
+      var dwid = OPT.cap ? Math.min(P.drawWidth(rf, fw), maxW) : fw;
+      var putF = function (n, c) { blit(buf, F.layer[n], fx - PAD, fy - PAD, dwid + 2 * PAD, fh + 2 * PAD, u, fb, c); };
+      var isFull = fw >= maxW - 0.01;
+      putF('fill', sg.fill);
+      if (OPT.gloss) putF('gloss', WHITE);
+      if (isFull) { if (OPT.full) putF('full', WHITE); }
+      else if (OPT.head) {
+        var ha = P.headAlpha(rf, dwid), hw = P.headWidth(rf) + PAD;
+        if (ha > 0) blit(buf, F.layer.head, fx + dwid + PAD - hw, fy - PAD, hw, fh + 2 * PAD, u, [0, F.headB[1], 0, F.headB[3]], [1, 1, 1, ha]);
+      }
+    });
+    if (kind === 'rec' && OPT.tick && bar.steps && P.recipeRadius(bar.r)) {
+      var T = recLayers(P.recipeRadius(bar.r)).layer.tick;
+      for (var k = 1; k < bar.steps; k++) blit(buf, T, x + bar.w * k / bar.steps - 1, y + 1, 2, bar.h - 2, 0.5, [0, 0, 0, 0], WHITE);
+    }
+  }
+
+  // ═════ 장면 ═════
+  var TVAL = 0.62;
+  function finish(buf, zoom, label, texts) {
+    var cv = buf.toCanvas(1);
+    if (texts) { var ctx = cv.getContext('2d'); ctx.textBaseline = 'top'; texts.forEach(function (t) {
+      ctx.fillStyle = shownCss(t.c); ctx.textAlign = t.align || 'left';
+      ctx.font = (t.bold ? 'bold ' : '') + t.size + 'px ' + (t.ui ? 'Jua, ' : 'Pretendard, ') + '"Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
+      ctx.fillText(t.v, t.x, t.y);
+    }); }
+    if (zoom && zoom.z) {
+      var z = zoom.z, c = document.createElement('canvas'); c.width = zoom.w * z; c.height = zoom.h * z; c.className = 'px';
+      c.style.width = c.width + 'px'; c.style.height = c.height + 'px';
+      var x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(cv, zoom.x, zoom.y, zoom.w, zoom.h, 0, 0, c.width, c.height); cv = c;
+    }
+    cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', label);
+    return cv;
+  }
+  // 런 HUD 왼쪽 아래 — RunHudView: LevelPanel (280×56) + FeverPanel (280×56 · 간격 12). 패널 = BuildPanel(r14 · ElevateCard · 링)
+  function hudScene(kind, zoom) {
+    var buf = new Buf(604, 84, FIELD_BG), lx = 14, fx = 14 + 280 + 12, py = 14, t = TVAL;
+    drawCard(buf, lx, py, 280, 56, 14, tk('RunHudPanelColor'), tk('RunLevelPanelBorderColor'), 1.35);
+    drawCard(buf, lx + 8, py + 8, 40, 40, 11, tk('RunLevelBadgeColor'), tk('RunLevelBadgeBorderColor'), 1);
+    drawBar(buf, kind, BARS.xp, lx + 56, py + 26, t);
+    drawCard(buf, fx, py, 280, 56, 14, tk('RunFeverPanelColor'), tk('FeverThemeColor', 0.82), 1.5);
+    drawBar(buf, kind, BARS.fever, fx + 12, py + 28, t);
+    var xp = Math.round(2000 * t);
+    return finish(buf, zoom, (kind === 'cur' ? '현행' : '레시피') + ' 런 HUD XP 바와 피버 게이지 ' + Math.round(t * 100) + '%', [
+      { v: '7', x: lx + 8 + 6, y: py + 8 + 6, size: 24, c: tk('TextTitleColor'), bold: true, ui: true },
+      { v: 'Lv.7   XP ' + xp.toLocaleString('en-US') + '/2,000', x: lx + 58, y: py + 8, size: 14, c: tk('TextCaptionColor') },
+      { v: 'FEVER 게이지', x: fx + 12, y: py + 6, size: 14, c: tk('TextCaptionColor') },
+      { v: Math.round(t * 100) + '%', x: fx + 132, y: py + 6, size: 14, c: tk('TextCaptionColor') }
+    ]);
+  }
+  // 무기 상세 카드(ArmamentWeaponView) — 카드 면 SurfaceRaisedTop α.9 + 테두리(단순화) · "Lv. n / 8"(금색) 아래 레벨 바(폭 320 중앙)
+  function armScene(kind, zoom) {
+    var buf = new Buf(420, 84, tk('OverlayPanelColor')), cw = 392, cx = 14, lvl = Math.round(TVAL * 8), t = lvl / 8;
+    fillProc(buf, cx, 10, cw, 64, 14, tk('SurfaceRaisedTopColor', 0.9)); ringProc(buf, cx, 10, cw, 64, 14, 1.2, tk('ButtonBorderColor', 0.9));
+    var bx = cx + cw / 2 - 160, by = 46;
+    drawBar(buf, kind, BARS.arm, bx, by, t);
+    return finish(buf, zoom, (kind === 'cur' ? '현행' : '레시피') + ' 무기 레벨 바 ' + lvl + '/8', [
+      { v: 'Lv. ' + lvl + ' / 8', x: cx + 24, y: 20, size: 13, c: tk('kGoldenNodeTint'), bold: true }]);
+  }
+  // 연구소 개요 카드(LabShellView.CardView) — 카드 면 OverlayShellPanel + 테두리(단순화) · 제목 y18 · 값 y52 · 설명 y84 · 진행 띠 y132
+  function labScene(kind, zoom) {
+    var buf = new Buf(368, 176, tk('OverlayPanelColor')), cx = 14, cy = 10, cw = 340, t = TVAL;
+    fillProc(buf, cx, cy, cw, 156, 14, tk('OverlayShellPanelColor')); ringProc(buf, cx, cy, cw, 156, 14, 1.2, tk('ButtonBorderColor'));
+    drawBar(buf, kind, BARS.lab, cx + 20, cy + 132, t);
+    var done = Math.round(306 * t);
+    return finish(buf, zoom, (kind === 'cur' ? '현행' : '레시피') + ' 연구소 개요 카드 진행 띠 ' + Math.round(t * 100) + '%', [
+      { v: '스킬트리', x: cx + 20, y: cy + 18, size: 18, c: tk('TextNumColor'), bold: true, ui: true },
+      { v: done + ' / 306', x: cx + 20, y: cy + 50, size: 24, c: tk('MenuCursorColor') },
+      { v: '노드를 해금해 성장 경로를 확장하세요.', x: cx + 20, y: cy + 86, size: 14, c: tk('TextTitleColor') }]);
+  }
+  function mount(id, cv) { var h = document.getElementById(id); h.innerHTML = ''; h.appendChild(cv); }
+  function buildScenes() {
+    ['cur', 'rec'].forEach(function (k) {
+      mount('hud-' + k, hudScene(k)); mount('hud-' + k + '-z', hudScene(k, { x: 8, y: 8, w: 292, h: 68, z: 3 }));
+      mount('arm-' + k, armScene(k)); mount('arm-' + k + '-z', armScene(k, { x: 20, y: 14, w: 380, h: 50, z: 3 }));
+      mount('lab-' + k, labScene(k)); mount('lab-' + k + '-z', labScene(k, { x: 24, y: 132, w: 170, h: 26, z: 3 }));
+    });
+  }
+
+  // ── 표: 바 하나씩 — 자기 면 색 위에
+  function oneBar(kind, bar, t, z) {
+    var m = 8, buf = new Buf(Math.ceil(bar.w) + 2 * m, bar.h + 2 * m, tk(bar.surface, 1));
+    drawBar(buf, kind, bar, m, m, t);
+    var cv = z ? finish(buf, { x: 0, y: 0, w: z.w || buf.w, h: buf.h, z: z.z }, '') : finish(buf, null, '');
+    cv.setAttribute('aria-label', (kind === 'cur' ? '현행 ' : '레시피 ') + bar.name + ' ' + Math.round(t * 100) + '%');
+    return cv;
+  }
+  function hx(n) { var c = THEME[n]; return n.replace(/Color$/, '') + ' ' + hexOf(c) + (c[3] < 1 ? ' α' + c[3] : ''); }
+  function tokOf(bar) {
+    if (bar.segs) return '트랙 = 시대색 ×0.48 α0.9 · 채움 = 시대색: ' + bar.segs.map(function (s) { return hx(s[0]); }).join(' / ');
+    return '트랙 ' + hx(bar.track) + ' · 채움 ' + hx(bar.fill) + ' · 놓이는 면 ' + hx(bar.surface);
+  }
+  function buildMatrix() {
+    var tb = document.getElementById('matrix'); tb.innerHTML = '';
+    Object.keys(BARS).forEach(function (id) {
+      var bar = BARS[id], tr = document.createElement('tr'), td = document.createElement('td'); td.className = 'state';
+      td.innerHTML = bar.name + '<small>' + bar.sub + '</small>'; tr.appendChild(td);
+      ['cur', 'rec'].forEach(function (k) { var c = document.createElement('td'); c.appendChild(oneBar(k, bar, TVAL)); tr.appendChild(c); });
+      var t2 = document.createElement('td'); t2.className = 'tok'; t2.textContent = tokOf(bar); tr.appendChild(t2);
+      tb.appendChild(tr);
+    });
+  }
+  var SHORT_T = [0, 0.01, 0.03, 0.5, 1];
+  function buildShorts() {
+    var tb = document.getElementById('shorts'); tb.innerHTML = '';
+    ['xp', 'arm', 'lab'].forEach(function (id) {
+      var bar = BARS[id];
+      SHORT_T.forEach(function (t, i) {
+        var tr = document.createElement('tr');
+        if (i === 0) { var td = document.createElement('td'); td.className = 'state'; td.rowSpan = SHORT_T.length; td.innerHTML = bar.name + '<small>왼쪽 끝 60단위 · 100%는 오른쪽 끝</small>'; tr.appendChild(td); }
+        var tv = document.createElement('td'); tv.className = 'tok'; tv.textContent = Math.round(t * 100) + '% · 폭 ' + ((bar.w - 2 * bar.inset) * t).toFixed(1); tr.appendChild(tv);
+        ['cur', 'rec'].forEach(function (k) {
+          var c = document.createElement('td'), m = 8, buf = new Buf(bar.w + 2 * m, bar.h + 2 * m, tk(bar.surface, 1));
+          drawBar(buf, k, bar, m, m, t);
+          var crop = t >= 1 ? { x: buf.w - 76, y: 0, w: 76, h: buf.h, z: 4 } : { x: 0, y: 0, w: 76, h: buf.h, z: 4 };
+          c.appendChild(finish(buf, crop, (k === 'cur' ? '현행 ' : '레시피 ') + bar.name + ' ' + Math.round(t * 100) + '% 확대')); tr.appendChild(c);
+        });
+        tb.appendChild(tr);
+      });
+    });
+  }
+
+  // ── 굽는 텍스처 시트(원본 바이트 그대로 · 6배)
+  function rawCanvas(tex, Z, lines) {
+    var c = document.createElement('canvas'); c.width = tex.W; c.height = tex.H;
+    var x = c.getContext('2d'), img = x.createImageData(tex.W, tex.H), r = tex.raw;
+    for (var y = 0; y < tex.H; y++) for (var xx = 0; xx < tex.W; xx++) { var si = (y * r.stride + r.sx + xx) * 4, di = (y * tex.W + xx) * 4; for (var k = 0; k < 4; k++) img.data[di + k] = r.data[si + k]; }
+    x.putImageData(img, 0, 0);
+    var o = document.createElement('canvas'); o.width = tex.W * Z; o.height = tex.H * Z; o.className = 'px'; o.style.width = o.width + 'px'; o.style.height = o.height + 'px';
+    var ox = o.getContext('2d'); ox.imageSmoothingEnabled = false; ox.drawImage(c, 0, 0, o.width, o.height);
+    ox.strokeStyle = 'rgba(87,209,184,0.55)'; ox.setLineDash([4, 4]);
+    (lines.v || []).forEach(function (v) { ox.beginPath(); ox.moveTo(v * Z + 0.5, 0); ox.lineTo(v * Z + 0.5, o.height); ox.stroke(); });
+    (lines.h || []).forEach(function (v) { ox.beginPath(); ox.moveTo(0, v * Z + 0.5); ox.lineTo(o.width, v * Z + 0.5); ox.stroke(); });
+    return o;
+  }
+  function fig(cv, cap) { var f = document.createElement('figure'), c = document.createElement('figcaption'); c.textContent = cap; cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', cap); f.appendChild(cv); f.appendChild(c); return f; }
+  function buildSheet() {
+    var host = document.getElementById('sheet'); host.innerHTML = '';
+    P.RADII.forEach(function (r) {
+      var R = recLayers(r);
+      P.LAYERS.concat(['head']).forEach(function (n) {
+        var tex = R.layer[n], ln = n === 'head' ? { h: [R.headB[1], tex.H - R.headB[3]] } : { v: [R.b, tex.W - R.b], h: [R.b, tex.H - R.b] };
+        host.appendChild(fig(rawCanvas(tex, 6, ln), 'gauge_r' + r + '_' + n + ' · ' + tex.W + '×' + tex.H));
+      });
+    });
+    var tk2 = recLayers(4).layer.tick; host.appendChild(fig(rawCanvas(tk2, 12, {}), 'gauge_tick · ' + tk2.W + '×' + tk2.H));
+  }
+
+  function build() { buildScenes(); buildMatrix(); buildShorts(); buildSheet(); }
+  function live() { buildScenes(); buildMatrix(); }   // 값 슬라이더는 장면·표만 다시 그린다
+
+  var tIn = document.getElementById('t'), tOut = document.getElementById('t-out');
+  function setT(pct) { TVAL = pct / 100; tIn.value = pct; tOut.textContent = pct + '%'; live(); }
+  tIn.addEventListener('input', function () { setT(parseFloat(tIn.value)); });
+  document.querySelectorAll('.seg[data-t]').forEach(function (b) { b.addEventListener('click', function () { setT(parseFloat(b.dataset.t)); }); });
+  var kIn = document.getElementById('k'), kOut = document.getElementById('k-out');
+  kIn.addEventListener('input', function () { K = parseFloat(kIn.value); kOut.textContent = '×' + K; build(); });
+  var OPTS = ['groove', 'gloss', 'head', 'full', 'tick', 'cap'];
+  OPTS.forEach(function (k) { document.getElementById('opt-' + k).addEventListener('change', function (e) { OPT[k] = e.target.checked; build(); }); });
+  // ?t=3&k=1.5&groove=0 … — 헤드리스 렌더 검증용
+  var q = new URLSearchParams(location.search);
+  if (q.has('k')) { K = parseFloat(q.get('k')); kIn.value = K; kOut.textContent = '×' + K; }
+  if (q.has('t')) { TVAL = parseFloat(q.get('t')) / 100; tIn.value = TVAL * 100; tOut.textContent = (TVAL * 100) + '%'; }
+  if (q.get('quant') === '0') QUANT = false;
+  OPTS.forEach(function (k) { if (q.has(k)) { OPT[k] = q.get(k) === '1'; document.getElementById('opt-' + k).checked = OPT[k]; } });
+
+  // ?probe=1 — 엔진 대조용: 엔진 캡처와 같은 장면(1540×130 · 바탕 RunHudPanelColor · 값 0 · 3 · 50 · 100% 네 줄 × 바 6종)의 원시 RGBA(base64)
+  function probe() {
+    var W = 1540, H = 130, ts = [0, 0.03, 0.5, 1], out = { W: W, H: H, K: K, opt: OPT, theme: THEME, bars: BARS };
+    var one = function (id, o) { var b = {}; Object.keys(BARS[id]).forEach(function (k) { b[k] = BARS[id][k]; }); Object.keys(o).forEach(function (k) { b[k] = o[k]; }); return b; };
+    var tlMid = { w: 200, h: 6, r: 3, inset: 0, hideZero: true, segs: [['EquipmentEraMidColor', 0, 1]] };
+    ['cur', 'rec'].forEach(function (kind) {
+      var buf = new Buf(W, H, tk('RunHudPanelColor'));
+      ts.forEach(function (t, i) {
+        var y0 = 10 + i * 30;
+        drawBar(buf, kind, BARS.xp, 10, y0, t); drawBar(buf, kind, BARS.fever, 232, y0, t);
+        drawBar(buf, kind, BARS.arm, 498, y0 + 2, t); drawBar(buf, kind, BARS.lab, 828, y0 + 4, t);
+        drawBar(buf, kind, one('ach', { fill: 'AchievementAccentColor' }), 1138, y0 + 2, t); drawBar(buf, kind, tlMid, 1324, y0 + 4, t);
+      });
+      var d = new Uint8Array(W * H * 4), bin = '';
+      for (var p = 0; p < W * H; p++) { d[p * 4] = toSrgb8(buf.r[p]); d[p * 4 + 1] = toSrgb8(buf.g[p]); d[p * 4 + 2] = toSrgb8(buf.b[p]); d[p * 4 + 3] = 255; }
+      for (var j = 0; j < d.length; j += 8192) bin += String.fromCharCode.apply(null, d.subarray(j, j + 8192));
+      out[kind] = btoa(bin);
+    });
+    var pre = document.createElement('pre'); pre.id = 'probe'; pre.style.display = 'none'; pre.textContent = JSON.stringify(out); document.body.appendChild(pre);
+  }
+  build();
+  if (q.get('probe') === '1') probe();
+})();
+</script>

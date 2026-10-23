@@ -1,0 +1,917 @@
+<!--
+  ui-recipe-pill-compare.html — 「UI 레시피 묶음 ⑥ 알약 배지」 **비교 목업**(2026-10-03 · owner 판정 완료 — 맨 아래 「owner 판정」 절).
+  기본값 = owner 판정(`1a 2a 3a 4b 5a 6a`) = 게임 구현(`CanvasUi.PillBadge` → `RecipePillBadge`): ①②③ 켬 · ④ 강조 발광 끔 · ⑤ 네 벌 공유 · ⑥ 6곳 · 질감 ×1.25.
+    `drawPill` 의 rec 분기가 게임 레이어 순서·좌표·색 입히기 규칙의 정본이다(EditMode `RecipeArtUiPillTests` 가 이 파일을 읽어 대조한다).
+    ④ 발광 토글은 비교용으로만 남았다 — 게임이 쓰는 **출하 시트**(`P.bakeRecipes(r, K).pill` · 7칸)에는 glow 칸이 없고, 이 페이지만 목업 시트(`P.bakeSheet(r, K, { glow: true })` · 8칸)를 굽는다.
+  무엇의 비교본인가: Canvas 알약 6종(장비 보물티켓 배지 · 런 결과 NEW BEST · FEVER 배지 · 런 HUD 온보딩 토스트 · 런 HUD 아키 토큰 칩 · 젬 타일 NEW 뱃지)의
+    「현행(main a7e7bae9 이 실제로 그리는 것 = 절차식 RoundedFill / RoundedRing / Elevate)」 ↔ 「알약 전용 레시피 후보」.
+  ⚠ 화면 정본이 아니다 — 비주얼 정본은 html/ui-prototype.html 이고, 이 파일은 현행 ↔ 레시피 비교본이다(정본 반영은 승인 후).
+  ⚠ 레시피 열은 **목업의 리니어 합성값**이다. 게임 구현은 있지만(2026-10-03 포팅) 레시피 열도 엔진 캡처와 대조했다(아래 「엔진 대조 · 레시피 열」 — 전 픽셀 최대 2/255 · 차 > 3 인 픽셀 0개).
+  합성: 묶음 5(ui-recipe-progress-compare.html)의 실수(float) 버퍼 합성기를 그 구조 그대로 — 레이어를 리니어 실수로 쌓고 **마지막에 한 번만** 8비트로 내린다.
+    엔진의 세 사실: ① 틴트는 리니어에서 곱해진다 ② uGUI 는 색을 리니어 8비트로 반올림해 싣는다 ③ 텍스처 없는 사각형·쿼드 가장자리는 픽셀 중심 스냅.
+  의존: 같은 폴더의 js 2개만(상대 경로 · 외부 CDN 0) — ui-recipe-pill-bake.js(레시피 열) · ui-recipe-card-bake.js(런 HUD 골드 패널 바탕 · 읽기만).
+  file:// 로 열어도 동작한다. ?probe=1 = 엔진 대조용 원시 픽셀 덤프(헤드리스 검증용) · ?k=1.25&bevel=0&n=5 … = 헤드리스 렌더 검증용.
+-->
+<title>알약 배지 레시피 비교</title>
+<style>
+/* 레이아웃: 화면 맥락 3종(현행 / 레시피 + 확대) → 범위 안 알약 전부 표 → 폭 변화 → 반경 벌 → 굽는 텍스처 → 엔진 대조 → 범위 → 결정 문항.
+   버튼·패널·카드·탭·진행바 목업과 같은 틀. 색은 전부 게임 토큰(UiTheme.asset). 신규 색 0. 합성은 리니어(게임 = Linear 색공간). */
+:root {
+  color-scheme: dark;
+  --bg-deep: #070c11; --bg: #0a1017; --surface-b: #0e1620;
+  --btn-border: #26384a; --teal: #57d1b8; --text: #e2e8f0; --text-btn: #c9d6e2; --text-caption: #b9c6d3;
+  --muted: #7f8fa0; --rule: #1b2733;
+  --font-ui: "Jua", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --font-body: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --font-mono: Consolas, "SF Mono", Menlo, monospace;
+}
+html, body { background: var(--bg-deep); color: var(--text); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.6; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--font-ui); font-weight: 400; text-wrap: balance; margin: 0; }
+h1 { font-size: 30px; } h2 { font-size: 21px; }
+p { margin: 0; max-width: 72ch; color: var(--text-caption); }
+.lede { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+section { display: grid; gap: 14px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.controls .lab { font-size: 13px; color: var(--muted); }
+.sticky { position: sticky; top: 0; z-index: 5; background: var(--bg-deep); padding: 10px 0; border-bottom: 1px solid var(--rule); display: grid; gap: 8px; }
+.seg { font: 500 13px var(--font-mono); color: var(--text-btn); background: var(--surface-b); border: 1px solid var(--btn-border); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.seg:focus-visible, input:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text-btn); cursor: pointer; }
+.chk input, input[type=range] { accent-color: var(--teal); }
+output { font: 500 13px var(--font-mono); color: var(--teal); min-width: 5ch; }
+.stage { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+.stage .row { padding: 14px 24px 12px; border-top: 1px solid var(--rule); width: max-content; display: grid; gap: 8px; }
+.stage .row:first-child { border-top: 0; }
+.stage .ttl { font: 500 12px var(--font-mono); letter-spacing: .08em; color: var(--muted); position: sticky; left: 24px; width: max-content; }
+.stage .ttl b { color: var(--text); font-weight: 500; }
+.stage .pair { display: flex; gap: 20px; align-items: flex-start; }
+canvas.px { image-rendering: pixelated; display: block; }
+.hint { font-size: 13px; color: var(--muted); }
+.matrix { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); }
+table { border-collapse: collapse; width: max-content; }
+.matrix th, .matrix td { padding: 8px 14px; border-bottom: 1px solid var(--rule); vertical-align: middle; text-align: left; }
+.matrix th { font: 500 12px var(--font-mono); letter-spacing: .08em; color: var(--muted); }
+.matrix td.state { font-family: var(--font-ui); font-size: 16px; white-space: nowrap; }
+.matrix td.state small, .matrix td.tok { font: 400 11.5px var(--font-mono); color: var(--muted); letter-spacing: .02em; }
+.matrix td.state small { display: block; }
+.matrix td.tok { max-width: 230px; white-space: normal; line-height: 1.5; }
+.matrix tr:last-child td { border-bottom: 0; }
+.sheet { display: flex; flex-wrap: wrap; gap: 18px; padding: 20px; border: 1px solid var(--rule); border-radius: 12px;
+  background-color: #0c1218; background-image: linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%), linear-gradient(45deg, #111a22 25%, transparent 25%, transparent 75%, #111a22 75%);
+  background-size: 12px 12px; background-position: 0 0, 6px 6px; }
+figure { margin: 0; display: grid; gap: 6px; justify-items: start; }
+figcaption { font: 400 12px var(--font-mono); color: var(--muted); }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.note { border-top: 2px solid var(--btn-border); padding-top: 12px; display: grid; gap: 6px; min-width: 0; align-content: start; }
+.note h3 { margin: 0; font: 600 15px var(--font-body); color: var(--text); }
+.note p, .note li { font-size: 14px; color: var(--text-caption); }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+code { font-family: var(--font-mono); font-size: .9em; color: var(--text-btn); background: var(--surface-b); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.ask { border: 1px solid var(--teal); border-radius: 12px; padding: 18px 20px; display: grid; gap: 8px; background: color-mix(in srgb, var(--teal) 6%, var(--bg)); }
+.ask h2 { color: var(--teal); }
+.ask ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; color: var(--text-caption); }
+.ask b.rec { color: var(--teal); font-weight: 600; }
+.meter { font: 400 12px var(--font-mono); color: var(--muted); }
+table.m { border-collapse: collapse; font: 400 12px var(--font-mono); color: var(--text-caption); }
+table.m th, table.m td { padding: 4px 10px; border-bottom: 1px solid var(--rule); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.m th:first-child, table.m td:first-child { text-align: left; white-space: normal; }
+table.m th { color: var(--muted); font-weight: 400; }
+table.m.l { width: 100%; }
+table.m.l td, table.m.l th { text-align: left; white-space: normal; vertical-align: top; }
+.tbl { overflow-x: auto; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="lede">
+    <div class="eyebrow">UI 레시피 · 묶음 6 · 알약 배지</div>
+    <h1>알약 배지 · 현행 vs 레시피</h1>
+    <p class="meter">엔진 대조(현행 열 · Unity 리니어 RenderTexture 1540×110 · Play 없이 임시 Canvas): <span id="engine-line"><!--ENGINE-LINE-->알약 6종 12개 — 표본 105곳 최대 1/255 · 전 픽셀 평균 차 0.256 · 차 &gt; 3 인 픽셀 0개 · 전 픽셀 최대 1 (아래 「엔진 대조」 표)<!--/ENGINE-LINE--></span></p>
+    <p>알약은 양 끝이 반원인 캡슐 모양 배지입니다. 지금은 화면마다 단색 둥근 면 한 장과 테두리 선 한 장을 겹쳐 그립니다. 런 HUD의 두 곳(아키 토큰 칩, 온보딩 토스트)만 그 위에 세로 그라디언트와 직선 빛 한 줄이 얹혀 있고, 나머지는 평평한 색 조각입니다.
+      레시피판은 캡슐을 살짝 볼록한 알처럼 굽습니다. 위쪽 가장자리에 빛, 아래쪽 안에 그늘, 면 위쪽 절반에 옅은 광택(색 면은 아래로 갈수록 살짝 어둡게), 바깥에 옅은 그림자입니다. 면 색과 테두리 색은 지금처럼 게임이 입히므로 색을 바꾸는 기존 코드(등급색, 피버 세기)는 그대로 동작합니다. 위치·크기·색은 바꾸지 않습니다.</p>
+    <p><b>레시피 줄은 목업의 리니어 합성값입니다. 게임 구현을 엔진에서 캡처해 대조했고(아래 「엔진 대조 · 레시피 열」) 전 픽셀이 2/255 이내입니다.</b></p>
+  </header>
+
+  <div class="sticky">
+    <div class="controls" role="group" aria-label="폭과 질감">
+      <span class="lab">보물티켓 수(배지 폭)</span>
+      <input id="n" type="range" min="0" max="7" step="1" value="2" aria-label="보물티켓 수 — 글자가 길어지면 배지 폭이 늘어난다" style="width:200px">
+      <output id="n-out"></output>
+      <span class="lab">질감 세기</span>
+      <input id="k" type="range" min="0.5" max="2" step="0.25" value="1.25" aria-label="질감 세기">
+      <output id="k-out">×1.25</output>
+    </div>
+    <div class="controls" role="group" aria-label="레시피 제안 요소">
+      <span class="lab">레시피 제안 요소</span>
+      <label class="chk"><input type="checkbox" id="opt-bevel" checked> ① 입체감(위 림 빛 + 아래 그늘)</label>
+      <label class="chk"><input type="checkbox" id="opt-gloss" checked> ② 면 광택</label>
+      <label class="chk"><input type="checkbox" id="opt-shadow" checked> ③ 바깥 그림자</label>
+      <label class="chk"><input type="checkbox" id="opt-glow"> ④ 강조 발광(NEW BEST · FEVER · NEW)</label>
+      <label class="chk"><input type="checkbox" id="opt-share" checked> ⑤ 반경 벌 공유(높이 34 · 18)</label>
+    </div>
+  </div>
+
+  <section aria-labelledby="s1">
+    <h2 id="s1">화면 맥락 · 실제 크기와 3배 확대</h2>
+    <div class="stage">
+      <div class="row"><div class="ttl"><b>런 HUD 왼쪽 위</b> · 아키 토큰 칩 344×34 (런 내내 보임 — 골드 패널 바로 아래)</div>
+        <div class="pair"><figure><div id="hud-cur"></div><figcaption>현행</figcaption></figure><figure><div id="hud-rec"></div><figcaption>레시피 · 목업 리니어 합성값</figcaption></figure></div>
+        <div class="pair"><figure><div id="hud-cur-z"></div><figcaption>현행 · 칩 왼쪽 끝 3배</figcaption></figure><figure><div id="hud-rec-z"></div><figcaption>레시피 · 칩 왼쪽 끝 3배</figcaption></figure></div></div>
+      <div class="row"><div class="ttl"><b>런 화면 위 가운데</b> · FEVER 배지 200×38 (피버 중) · 온보딩 토스트 높이 32 (첫 런 안내 — 폭 914 중 왼쪽 420만)</div>
+        <div class="pair"><figure><div id="run-cur"></div><figcaption>현행</figcaption></figure><figure><div id="run-rec"></div><figcaption>레시피 · 목업 리니어 합성값</figcaption></figure></div>
+        <div class="pair"><figure><div id="run-cur-z"></div><figcaption>현행 · FEVER 3배</figcaption></figure><figure><div id="run-rec-z"></div><figcaption>레시피 · FEVER 3배</figcaption></figure></div></div>
+      <div class="row"><div class="ttl"><b>연구소 · 장비 탭 헤더 오른쪽</b> · 보물티켓 배지 (글자 폭 + 16)×32 · 위 슬라이더로 폭이 변함</div>
+        <div class="pair"><figure><div id="eq-cur"></div><figcaption>현행</figcaption></figure><figure><div id="eq-rec"></div><figcaption>레시피 · 목업 리니어 합성값</figcaption></figure></div>
+        <div class="pair"><figure><div id="eq-cur-z"></div><figcaption>현행 · 3배</figcaption></figure><figure><div id="eq-rec-z"></div><figcaption>레시피 · 3배</figcaption></figure></div></div>
+    </div>
+    <p class="hint">한 칸이 게임 픽셀 하나(1920×1080 기준)이고 게임과 같은 <b>리니어 블렌딩</b>으로 합성했습니다. 런 HUD 골드 패널은 게임과 같은 구운 카드(묶음 3)입니다. 장비 헤더 바는 게임과 같은 절차식 패널입니다.
+      런 화면 바탕색 #0c1621은 테마 토큰이 아니라 앞 목업이 쓰던 자리 표시 색입니다. 글자는 이 PC에 주아·Pretendard가 없으면 대체 글꼴로 나오고, 배지 폭도 그 글꼴로 잰 값입니다. 숫자는 예시입니다. FEVER 글자가 왼쪽 위에 붙어 있는 것은 게임 그대로입니다(<code>RunFxView</code> 주석: IMGUI 판 정렬 유지).</p>
+  </section>
+
+  <section aria-labelledby="s3">
+    <h2 id="s3">범위에 든 알약 전부 · 높이별 색별</h2>
+    <p>색 토큰은 <code>Assets/Resources/UI/UiTheme.asset</code> 값입니다. 레시피 열은 같은 면 색·테두리 색을 그대로 받습니다. 각 알약은 자기가 놓이는 면의 색 위에 그렸습니다. 아래 줄은 왼쪽 끝을 3배로 키운 것입니다. 긴 알약은 왼쪽 240단위만 보입니다.</p>
+    <div class="matrix"><table>
+      <thead><tr><th>알약</th><th>현행 · 실제 크기와 3배</th><th>레시피 · 실제 크기와 3배</th><th>게임이 입히는 색(공통)</th></tr></thead>
+      <tbody id="matrix"></tbody>
+    </table></div>
+    <h2 style="font-size:17px">폭이 달라질 때 · 원(폭 = 높이)부터 긴 알약까지 (3배 · 보물티켓 배지 색)</h2>
+    <div class="matrix"><table>
+      <thead><tr><th>폭 × 높이</th><th>현행</th><th>레시피(지금 토글 그대로)</th></tr></thead>
+      <tbody id="widths"></tbody>
+    </table></div>
+    <p class="hint">알약은 9-slice라 양 끝 캡은 고정이고 가운데만 늘어납니다. 폭이 높이와 같으면 원이 됩니다. 폭이 높이보다 짧아지는 자리는 게임에 없습니다(보물티켓 배지 최소 폭 72).</p>
+  </section>
+
+  <section aria-labelledby="s5">
+    <h2 id="s5">반경 벌 · 왜 「한 치수 작은 벌」까지만 공유하는가</h2>
+    <p>알약은 반경이 높이의 절반이라 높이마다 구운 그림이 따로 필요합니다. 실측 높이는 16 · 18 · 24 · 32 · 34 · 38 여섯 가지입니다. 앞 묶음의 규칙(요청 반경 이하 최대값)을 그대로 쓰면 높이 38짜리가 반경 16 그림을 받아 끝이 반원이 아니게 됩니다(맨 오른쪽).
+      제안은 <b>반경 차가 1 이하일 때만 공유</b>입니다. 높이 34는 반경 16 벌, 높이 18은 반경 8 벌을 같이 쓰고(끝에 직선 2단위), 나머지는 정확한 반원입니다. 그러면 굽는 벌은 8 · 12 · 16 · 19 네 벌입니다.</p>
+    <div class="sheet" id="share" style="background:var(--bg)"></div>
+  </section>
+
+  <section aria-labelledby="s4">
+    <h2 id="s4">레시피가 굽는 텍스처</h2>
+    <p>반경 19 · 16 · 12 · 8 네 벌이고, 벌마다 레이어 7칸(바깥 그림자 · 면 · 아래 그늘 · 광택 · 테두리 링 · 굵은 링 · 상단 림 빛)이 가로로 붙은 시트 한 장입니다. 게임이 굽는 것과 같은 시트입니다(강조 발광 칸은 판정에 따라 굽지 않습니다). 전부 흰색·회색이나 검정 알파 바탕이고 색은 게임이 입힙니다.
+      텍스처 1칸은 게임 0.5단위이고 점선이 9-slice 경계입니다. 결(노이즈)은 owner 판정(카드·패널·탭·진행바에서 끔)을 따라 굽지 않습니다.</p>
+    <div class="sheet" id="sheet"></div>
+  </section>
+
+  <section aria-labelledby="s6">
+    <h2 id="s6">엔진 대조 · 현행 열</h2>
+    <p>현행 열이 게임과 같은지 Unity 에디터에서 숫자로 확인했습니다. Play 없이 임시 Canvas에 뷰가 쓰는 것과 같은 호출(<code>CanvasUi.Pill</code> · <code>AddPillBorder</code> · <code>Fill</code> · <code>Panel</code> · <code>Rounded</code> · <code>ElevateCard</code> · <code>AddBorderImage</code> · <code>Place</code>)로 알약 6종 12개를 세우고, 리니어 RenderTexture(1540×110)로 읽었습니다. 바탕은 <code>RunHudPanelColor</code> 단색이고 글자는 넣지 않았습니다. 이 페이지의 <code>?probe=1</code>이 같은 장면을 그립니다.</p>
+    <div class="tbl"><table class="m" id="engine-table">
+      <tr><th>표본(sRGB 0–255)</th><th>엔진 R,G,B</th><th>목업 현행 열 R,G,B</th><th>최대 채널 차</th></tr>
+      <!--ENGINE-->
+      <tr><td>배경 (5,5)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>보물티켓 72×32 · 면 가운데 (46,26)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>보물티켓 72×32 · 왼쪽 캡 끝(가장자리) (10,26)</td><td>196, 157, 38</td><td>196, 158, 37</td><td>1</td></tr>
+      <tr><td>보물티켓 72×32 · 캡 45° 가장자리 (15,15)</td><td>123, 98, 28</td><td>122, 98, 28</td><td>1</td></tr>
+      <tr><td>보물티켓 72×32 · 캡 안쪽 (18,26)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>보물티켓 72×32 · 위 변 (46,10)</td><td>196, 158, 38</td><td>196, 158, 38</td><td>0</td></tr>
+      <tr><td>보물티켓 72×32 · 위 변 한 줄 아래 (46,11)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>보물티켓 72×32 · 위에서 1/4 (46,18)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>보물티켓 72×32 · 아래 변 (46,41)</td><td>196, 158, 38</td><td>196, 158, 38</td><td>0</td></tr>
+      <tr><td>보물티켓 72×32 · 오른쪽 캡 끝(링 옆) (81,26)</td><td>196, 157, 38</td><td>196, 158, 37</td><td>1</td></tr>
+      <tr><td>보물티켓 150×32 · 면 가운데 (175,26)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>보물티켓 150×32 · 왼쪽 캡 끝(가장자리) (100,26)</td><td>196, 157, 38</td><td>196, 158, 37</td><td>1</td></tr>
+      <tr><td>보물티켓 150×32 · 캡 45° 가장자리 (105,15)</td><td>123, 98, 28</td><td>122, 98, 28</td><td>1</td></tr>
+      <tr><td>보물티켓 150×32 · 캡 안쪽 (108,26)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>보물티켓 150×32 · 위 변 (175,10)</td><td>196, 158, 38</td><td>196, 158, 38</td><td>0</td></tr>
+      <tr><td>보물티켓 150×32 · 위 변 한 줄 아래 (175,11)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>보물티켓 150×32 · 위에서 1/4 (175,18)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>보물티켓 150×32 · 아래 변 (175,41)</td><td>196, 158, 38</td><td>196, 158, 38</td><td>0</td></tr>
+      <tr><td>보물티켓 150×32 · 오른쪽 캡 끝(링 옆) (249,26)</td><td>196, 157, 38</td><td>196, 158, 37</td><td>1</td></tr>
+      <tr><td>NEW BEST 196×24 · 면 가운데 (368,26)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 왼쪽 캡 끝(가장자리) (270,26)</td><td>254, 218, 61</td><td>254, 218, 61</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 캡 45° 가장자리 (274,18)</td><td>92, 79, 28</td><td>93, 79, 29</td><td>1</td></tr>
+      <tr><td>NEW BEST 196×24 · 캡 안쪽 (276,26)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 위 변 (368,14)</td><td>255, 219, 61</td><td>255, 219, 61</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 위 변 한 줄 아래 (368,15)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 아래 변 (368,37)</td><td>255, 219, 61</td><td>255, 219, 61</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 오른쪽 캡 끝(링 옆) (465,26)</td><td>254, 218, 61</td><td>254, 218, 61</td><td>0</td></tr>
+      <tr><td>FEVER 200×38 · 면 가운데 (590,25)</td><td>51, 21, 15</td><td>51, 20, 15</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 왼쪽 캡 끝(가장자리) (490,25)</td><td>162, 66, 29</td><td>162, 66, 29</td><td>0</td></tr>
+      <tr><td>FEVER 200×38 · 캡 45° 가장자리 (495,12)</td><td>163, 66, 29</td><td>162, 66, 29</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 캡 안쪽 (499,25)</td><td>51, 21, 15</td><td>51, 20, 15</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 위 변 (590,6)</td><td>163, 66, 29</td><td>162, 66, 29</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 위 변 한 줄 아래 (590,7)</td><td>123, 50, 23</td><td>123, 49, 23</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 위에서 1/4 (590,16)</td><td>51, 21, 15</td><td>51, 20, 15</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 아래 변 (590,43)</td><td>163, 66, 29</td><td>162, 66, 29</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 오른쪽 캡 끝(링 옆) (689,25)</td><td>162, 66, 29</td><td>162, 66, 29</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 면 가운데 (590,79)</td><td>37, 17, 18</td><td>37, 17, 18</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 왼쪽 캡 끝(가장자리) (490,79)</td><td>119, 47, 25</td><td>118, 47, 25</td><td>1</td></tr>
+      <tr><td>FEVER 세기 50% · 캡 45° 가장자리 (495,66)</td><td>119, 47, 25</td><td>119, 48, 25</td><td>1</td></tr>
+      <tr><td>FEVER 세기 50% · 캡 안쪽 (499,79)</td><td>37, 17, 18</td><td>37, 17, 18</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 위 변 (590,60)</td><td>119, 47, 25</td><td>119, 48, 25</td><td>1</td></tr>
+      <tr><td>FEVER 세기 50% · 위 변 한 줄 아래 (590,61)</td><td>90, 36, 22</td><td>90, 36, 22</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 위에서 1/4 (590,70)</td><td>37, 17, 18</td><td>37, 17, 18</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 아래 변 (590,97)</td><td>119, 47, 25</td><td>119, 48, 25</td><td>1</td></tr>
+      <tr><td>FEVER 세기 50% · 오른쪽 캡 끝(링 옆) (689,79)</td><td>119, 47, 25</td><td>118, 47, 25</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 면 가운데 (860,26)</td><td>13, 24, 32</td><td>13, 24, 32</td><td>0</td></tr>
+      <tr><td>토스트 300×32 · 왼쪽 캡 끝(가장자리) (710,26)</td><td>135, 224, 196</td><td>135, 224, 195</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 캡 45° 가장자리 (715,15)</td><td>84, 142, 125</td><td>85, 142, 125</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 캡 안쪽 (718,26)</td><td>13, 24, 32</td><td>13, 24, 32</td><td>0</td></tr>
+      <tr><td>토스트 300×32 · 위 변 (860,10)</td><td>143, 228, 201</td><td>142, 229, 201</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 위 변 한 줄 아래 (860,11)</td><td>107, 115, 123</td><td>106, 115, 123</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 위에서 1/4 (860,18)</td><td>18, 29, 38</td><td>18, 29, 38</td><td>0</td></tr>
+      <tr><td>토스트 300×32 · 아래 변 (860,41)</td><td>136, 224, 196</td><td>136, 225, 196</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 오른쪽 캡 끝(링 옆) (1009,26)</td><td>135, 224, 196</td><td>135, 224, 195</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 면 가운데 (216,78)</td><td>13, 24, 32</td><td>13, 24, 32</td><td>0</td></tr>
+      <tr><td>토스트 413.6×32 · 왼쪽 캡 끝(가장자리) (10,78)</td><td>135, 224, 196</td><td>135, 224, 195</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 캡 45° 가장자리 (15,67)</td><td>84, 142, 125</td><td>85, 142, 125</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 캡 안쪽 (18,78)</td><td>13, 24, 32</td><td>13, 24, 32</td><td>0</td></tr>
+      <tr><td>토스트 413.6×32 · 위 변 (216,62)</td><td>143, 228, 201</td><td>142, 229, 201</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 위 변 한 줄 아래 (216,63)</td><td>107, 115, 123</td><td>106, 115, 123</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 위에서 1/4 (216,70)</td><td>18, 29, 38</td><td>18, 29, 38</td><td>0</td></tr>
+      <tr><td>토스트 413.6×32 · 아래 변 (216,93)</td><td>136, 224, 196</td><td>136, 225, 196</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 오른쪽 캡 끝(링 옆) (423,78)</td><td>135, 224, 196</td><td>135, 224, 195</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 · 면 가운데 (1202,25)</td><td>17, 24, 32</td><td>17, 24, 32</td><td>0</td></tr>
+      <tr><td>아키 칩 344×34 · 왼쪽 캡 끝(가장자리) (1030,25)</td><td>173, 144, 235</td><td>173, 144, 236</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 · 캡 45° 가장자리 (1035,14)</td><td>118, 100, 163</td><td>118, 100, 163</td><td>0</td></tr>
+      <tr><td>아키 칩 344×34 · 캡 안쪽 (1039,25)</td><td>17, 24, 32</td><td>17, 24, 32</td><td>0</td></tr>
+      <tr><td>아키 칩 344×34 · 위 변 (1202,8)</td><td>176, 149, 239</td><td>177, 149, 239</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 · 위 변 한 줄 아래 (1202,9)</td><td>137, 128, 175</td><td>136, 128, 176</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 · 위에서 1/4 (1202,17)</td><td>20, 29, 37</td><td>19, 29, 37</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 · 아래 변 (1202,41)</td><td>173, 144, 236</td><td>174, 144, 236</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 · 오른쪽 캡 끝(링 옆) (1373,25)</td><td>173, 144, 235</td><td>173, 144, 236</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 면 가운데 (1202,79)</td><td>17, 24, 32</td><td>17, 24, 32</td><td>0</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 왼쪽 캡 끝(가장자리) (1018,79)</td><td>171, 142, 234</td><td>172, 143, 234</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 캡 45° 가장자리 (1023,66)</td><td>163, 136, 223</td><td>163, 136, 223</td><td>0</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 캡 안쪽 (1026,79)</td><td>17, 24, 32</td><td>17, 24, 32</td><td>0</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 위 변 (1202,61)</td><td>170, 146, 229</td><td>170, 145, 229</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 위 변 한 줄 아래 (1202,62)</td><td>99, 84, 138</td><td>99, 85, 138</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 위에서 1/4 (1202,70)</td><td>20, 29, 38</td><td>19, 29, 37</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 아래 변 (1202,97)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 오른쪽 캡 끝(링 옆) (1386,79)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>NEW 28×16 일반 · 면 가운데 (1414,24)</td><td>152, 159, 171</td><td>153, 159, 171</td><td>1</td></tr>
+      <tr><td>NEW 28×16 일반 · 왼쪽 캡 끝(가장자리) (1400,24)</td><td>151, 158, 169</td><td>151, 158, 170</td><td>1</td></tr>
+      <tr><td>NEW 28×16 일반 · 캡 45° 가장자리 (1402,19)</td><td>152, 159, 171</td><td>153, 159, 171</td><td>1</td></tr>
+      <tr><td>NEW 28×16 일반 · 캡 안쪽 (1404,24)</td><td>152, 159, 171</td><td>153, 159, 171</td><td>1</td></tr>
+      <tr><td>NEW 28×16 일반 · 위 변 (1414,16)</td><td>152, 159, 171</td><td>153, 159, 171</td><td>1</td></tr>
+      <tr><td>NEW 28×16 일반 · 위 변 한 줄 아래 (1414,17)</td><td>152, 159, 171</td><td>153, 159, 171</td><td>1</td></tr>
+      <tr><td>NEW 28×16 일반 · 위에서 1/4 (1414,20)</td><td>152, 159, 171</td><td>153, 159, 171</td><td>1</td></tr>
+      <tr><td>NEW 28×16 일반 · 아래 변 (1414,31)</td><td>152, 159, 171</td><td>153, 159, 171</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 · 면 가운데 (1466,23)</td><td>240, 162, 32</td><td>240, 162, 33</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 · 왼쪽 캡 끝(가장자리) (1450,23)</td><td>238, 161, 33</td><td>238, 161, 33</td><td>0</td></tr>
+      <tr><td>NEW 32×18 전설 · 캡 45° 가장자리 (1453,17)</td><td>240, 162, 32</td><td>240, 162, 33</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 · 캡 안쪽 (1455,23)</td><td>240, 162, 32</td><td>240, 162, 33</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 · 위 변 (1466,14)</td><td>240, 162, 32</td><td>240, 162, 33</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 · 위 변 한 줄 아래 (1466,15)</td><td>240, 162, 32</td><td>240, 162, 33</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 · 위에서 1/4 (1466,19)</td><td>240, 162, 32</td><td>240, 162, 33</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 · 아래 변 (1466,31)</td><td>240, 162, 32</td><td>240, 162, 33</td><td>1</td></tr>
+      <tr><td>NEW 28×16 영웅 · 면 가운데 (1414,78)</td><td>164, 83, 241</td><td>164, 83, 241</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 왼쪽 캡 끝(가장자리) (1400,78)</td><td>163, 82, 240</td><td>163, 82, 240</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 캡 45° 가장자리 (1402,73)</td><td>164, 83, 241</td><td>164, 83, 241</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 캡 안쪽 (1404,78)</td><td>164, 83, 241</td><td>164, 83, 241</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 위 변 (1414,70)</td><td>164, 83, 241</td><td>164, 83, 241</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 위 변 한 줄 아래 (1414,71)</td><td>164, 83, 241</td><td>164, 83, 241</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 위에서 1/4 (1414,74)</td><td>164, 83, 241</td><td>164, 83, 241</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 아래 변 (1414,85)</td><td>164, 83, 241</td><td>164, 83, 241</td><td>0</td></tr>
+      <tr><td>전 픽셀 1540×110</td><td colspan="2">평균 차 0.256 · 차 &gt; 3 인 픽셀 0개 · 차 &gt; 8 인 픽셀 0개 · 최대 1</td><td>표본 105곳 최대 1</td></tr>
+      <!--/ENGINE-->
+    </table></div>
+    <p class="hint" id="engine-hint"><!--ENGINE-HINT-->범위에 든 높이 여섯 가지(16 · 18 · 24 · 32 · 34 · 38)와 펄스로 커진 칩(소수 좌표 368.08×36.38), 피버 세기 50%를 모두 넣었습니다. 처음에는 토스트와 아키 토큰 칩의 위 변 둘째 줄이 최대 86 어긋났습니다. 원인은 직선 빛 줄(높이 1.5)이 정수 좌표에서 픽셀 두 줄을 먹는 것이었고(픽셀 중심이 정확히 아래 변 위에 오면 포함), 합성기의 세로 스냅 규칙을 그렇게 고친 뒤 전 픽셀 최대 1이 됐습니다. 레시피 열의 대조는 아래 「엔진 대조 · 레시피 열」 절에 있습니다. 레시피 열의 합성기는 현행 열과 같은 코드(같은 9-slice 표본 · 같은 리니어 블렌딩)입니다.<!--/ENGINE-HINT--></p>
+  </section>
+
+  <section aria-labelledby="s6b">
+    <h2 id="s6b">엔진 대조 · 레시피 열</h2>
+    <p>포팅한 게임 구현(<code>CanvasUi.PillBadge</code> · recipe-art <code>v0.9.0</code>)을 같은 방법으로 캡처해 이 페이지의 레시피 열(판정 기본값: ①②③ 켬 · ④ 끔 · ⑤ 공유 켬 · ×1.25)과 대조했습니다. Play 없이 임시 Canvas에 알약 6종 12개를 세우고 리니어 RenderTexture(1540×110)로 읽었습니다. 배치는 현행 열 대조와 같고, FEVER 세기 50%는 면·링 알파와 장식 세기(<code>DecorStrength</code>)를 함께 0.5로 넣었습니다.</p>
+    <div class="tbl"><table class="m" id="engine-rec-table">
+      <tr><th>표본(sRGB 0–255)</th><th>엔진 R,G,B</th><th>목업 레시피 열 R,G,B</th><th>최대 채널 차</th></tr>
+      <!--ENGINE-REC-->
+      <tr><td>배경 (5,5)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>보물티켓 72×32 · 면 가운데 (46,26)</td><td>16, 22, 31</td><td>16, 22, 30</td><td>1</td></tr>
+      <tr><td>보물티켓 72×32 · 위 림 빛(위 변) (46,10)</td><td>197, 177, 134</td><td>198, 177, 134</td><td>1</td></tr>
+      <tr><td>보물티켓 72×32 · 링 위 둘째 줄 (46,11)</td><td>20, 32, 40</td><td>21, 31, 40</td><td>1</td></tr>
+      <tr><td>보물티켓 72×32 · 광택 띠(위에서 1/4) (46,18)</td><td>18, 27, 35</td><td>19, 27, 36</td><td>1</td></tr>
+      <tr><td>보물티켓 72×32 · 아래 그늘(아래에서 3) (46,38)</td><td>10, 11, 18</td><td>9, 11, 18</td><td>1</td></tr>
+      <tr><td>보물티켓 72×32 · 링 아래 (46,41)</td><td>196, 158, 37</td><td>196, 158, 37</td><td>0</td></tr>
+      <tr><td>보물티켓 72×32 · 링 옆(왼쪽 캡 끝) (10,26)</td><td>196, 157, 38</td><td>196, 157, 38</td><td>0</td></tr>
+      <tr><td>보물티켓 72×32 · 오른쪽 캡 끝 (81,26)</td><td>196, 157, 38</td><td>196, 157, 38</td><td>0</td></tr>
+      <tr><td>보물티켓 72×32 · 캡 45° 가장자리 (15,15)</td><td>127, 109, 70</td><td>127, 109, 71</td><td>1</td></tr>
+      <tr><td>보물티켓 72×32 · 캡 45° 아래쪽 (15,37)</td><td>187, 150, 36</td><td>187, 151, 36</td><td>1</td></tr>
+      <tr><td>보물티켓 72×32 · 바깥 그림자(바로 아래 +1) (46,42)</td><td>6, 6, 11</td><td>5, 5, 11</td><td>1</td></tr>
+      <tr><td>보물티켓 72×32 · 바깥 그림자(+3) (46,44)</td><td>11, 11, 19</td><td>11, 11, 19</td><td>0</td></tr>
+      <tr><td>보물티켓 150×32 · 면 가운데 (175,26)</td><td>16, 22, 31</td><td>16, 22, 30</td><td>1</td></tr>
+      <tr><td>보물티켓 150×32 · 위 림 빛(위 변) (175,10)</td><td>197, 177, 134</td><td>198, 177, 134</td><td>1</td></tr>
+      <tr><td>보물티켓 150×32 · 링 위 둘째 줄 (175,11)</td><td>20, 32, 40</td><td>21, 31, 40</td><td>1</td></tr>
+      <tr><td>보물티켓 150×32 · 광택 띠(위에서 1/4) (175,18)</td><td>18, 27, 35</td><td>19, 27, 36</td><td>1</td></tr>
+      <tr><td>보물티켓 150×32 · 아래 그늘(아래에서 3) (175,38)</td><td>10, 11, 18</td><td>9, 11, 18</td><td>1</td></tr>
+      <tr><td>보물티켓 150×32 · 링 아래 (175,41)</td><td>196, 158, 37</td><td>196, 158, 37</td><td>0</td></tr>
+      <tr><td>보물티켓 150×32 · 링 옆(왼쪽 캡 끝) (100,26)</td><td>196, 157, 38</td><td>196, 157, 38</td><td>0</td></tr>
+      <tr><td>보물티켓 150×32 · 오른쪽 캡 끝 (249,26)</td><td>196, 157, 38</td><td>196, 157, 38</td><td>0</td></tr>
+      <tr><td>보물티켓 150×32 · 캡 45° 가장자리 (105,15)</td><td>127, 109, 70</td><td>127, 109, 71</td><td>1</td></tr>
+      <tr><td>보물티켓 150×32 · 캡 45° 아래쪽 (105,37)</td><td>187, 150, 36</td><td>187, 151, 36</td><td>1</td></tr>
+      <tr><td>보물티켓 150×32 · 바깥 그림자(바로 아래 +1) (175,42)</td><td>6, 6, 11</td><td>5, 5, 11</td><td>1</td></tr>
+      <tr><td>보물티켓 150×32 · 바깥 그림자(+3) (175,44)</td><td>11, 11, 19</td><td>11, 11, 19</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 위 림 빛(위 변) (368,14)</td><td>241, 218, 139</td><td>241, 218, 139</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 링 위 둘째 줄 (368,15)</td><td>13, 13, 22</td><td>13, 13, 22</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 링 아래 (368,37)</td><td>255, 219, 61</td><td>255, 219, 61</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 링 옆(왼쪽 캡 끝) (270,26)</td><td>254, 218, 61</td><td>254, 218, 61</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 오른쪽 캡 끝 (465,26)</td><td>254, 218, 61</td><td>254, 218, 61</td><td>0</td></tr>
+      <tr><td>NEW BEST 196×24 · 캡 45° 가장자리 (274,18)</td><td>95, 84, 44</td><td>96, 84, 45</td><td>1</td></tr>
+      <tr><td>NEW BEST 196×24 · 캡 45° 아래쪽 (274,34)</td><td>239, 205, 58</td><td>239, 206, 58</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 면 가운데 (590,25)</td><td>47, 19, 13</td><td>47, 18, 13</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 위 림 빛(위 변) (590,6)</td><td>175, 134, 132</td><td>175, 133, 132</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 링 위 둘째 줄 (590,7)</td><td>123, 50, 23</td><td>123, 49, 23</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 아래 그늘(아래에서 3) (590,40)</td><td>38, 14, 10</td><td>37, 14, 10</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 링 아래 (590,43)</td><td>160, 65, 27</td><td>160, 64, 27</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 링 옆(왼쪽 캡 끝) (490,25)</td><td>161, 66, 29</td><td>161, 65, 29</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 오른쪽 캡 끝 (689,25)</td><td>161, 66, 29</td><td>161, 65, 29</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 캡 45° 가장자리 (496,12)</td><td>143, 67, 47</td><td>143, 67, 47</td><td>0</td></tr>
+      <tr><td>FEVER 200×38 · 캡 45° 아래쪽 (496,38)</td><td>161, 65, 28</td><td>161, 65, 28</td><td>0</td></tr>
+      <tr><td>FEVER 200×38 · 바깥 그림자(바로 아래 +1) (590,44)</td><td>6, 6, 11</td><td>5, 5, 11</td><td>1</td></tr>
+      <tr><td>FEVER 200×38 · 바깥 그림자(+3) (590,46)</td><td>11, 11, 19</td><td>11, 11, 19</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 면 가운데 (590,79)</td><td>34, 16, 18</td><td>34, 16, 18</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 위 림 빛(위 변) (590,60)</td><td>135, 99, 97</td><td>135, 99, 97</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 링 위 둘째 줄 (590,61)</td><td>90, 36, 22</td><td>90, 36, 22</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 아래 그늘(아래에서 3) (590,94)</td><td>29, 13, 17</td><td>29, 13, 16</td><td>1</td></tr>
+      <tr><td>FEVER 세기 50% · 링 아래 (590,97)</td><td>117, 46, 24</td><td>117, 46, 23</td><td>1</td></tr>
+      <tr><td>FEVER 세기 50% · 링 옆(왼쪽 캡 끝) (490,79)</td><td>118, 47, 25</td><td>118, 47, 25</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 오른쪽 캡 끝 (689,79)</td><td>118, 47, 25</td><td>118, 47, 25</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 캡 45° 가장자리 (496,66)</td><td>105, 48, 36</td><td>105, 49, 36</td><td>1</td></tr>
+      <tr><td>FEVER 세기 50% · 캡 45° 아래쪽 (496,92)</td><td>117, 46, 25</td><td>117, 47, 24</td><td>1</td></tr>
+      <tr><td>FEVER 세기 50% · 바깥 그림자(바로 아래 +1) (590,98)</td><td>9, 9, 17</td><td>9, 9, 17</td><td>0</td></tr>
+      <tr><td>FEVER 세기 50% · 바깥 그림자(+3) (590,100)</td><td>12, 12, 21</td><td>12, 12, 20</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 면 가운데 (860,26)</td><td>12, 22, 31</td><td>12, 22, 31</td><td>0</td></tr>
+      <tr><td>토스트 300×32 · 위 림 빛(위 변) (860,10)</td><td>159, 221, 205</td><td>159, 222, 206</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 링 위 둘째 줄 (860,11)</td><td>19, 32, 40</td><td>20, 31, 40</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 광택 띠(위에서 1/4) (860,18)</td><td>16, 27, 35</td><td>16, 27, 36</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 아래 그늘(아래에서 3) (860,38)</td><td>5, 12, 19</td><td>4, 11, 19</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 링 아래 (860,41)</td><td>136, 224, 196</td><td>136, 225, 196</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 링 옆(왼쪽 캡 끝) (710,26)</td><td>135, 223, 196</td><td>135, 224, 195</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 오른쪽 캡 끝 (1009,26)</td><td>135, 223, 196</td><td>135, 224, 195</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 캡 45° 가장자리 (715,15)</td><td>95, 144, 131</td><td>95, 144, 131</td><td>0</td></tr>
+      <tr><td>토스트 300×32 · 캡 45° 아래쪽 (715,37)</td><td>129, 214, 187</td><td>129, 214, 187</td><td>0</td></tr>
+      <tr><td>토스트 300×32 · 바깥 그림자(바로 아래 +1) (860,42)</td><td>6, 6, 11</td><td>5, 5, 11</td><td>1</td></tr>
+      <tr><td>토스트 300×32 · 바깥 그림자(+3) (860,44)</td><td>11, 11, 19</td><td>11, 11, 19</td><td>0</td></tr>
+      <tr><td>토스트 413.6×32 · 면 가운데 (216,78)</td><td>12, 22, 31</td><td>12, 22, 31</td><td>0</td></tr>
+      <tr><td>토스트 413.6×32 · 위 림 빛(위 변) (216,62)</td><td>159, 221, 205</td><td>159, 222, 206</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 링 위 둘째 줄 (216,63)</td><td>19, 32, 40</td><td>20, 31, 40</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 광택 띠(위에서 1/4) (216,70)</td><td>16, 27, 35</td><td>16, 27, 36</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 아래 그늘(아래에서 3) (216,90)</td><td>5, 12, 19</td><td>4, 11, 19</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 링 아래 (216,93)</td><td>136, 224, 196</td><td>136, 225, 196</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 링 옆(왼쪽 캡 끝) (10,78)</td><td>135, 223, 196</td><td>135, 224, 195</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 오른쪽 캡 끝 (423,78)</td><td>113, 189, 166</td><td>114, 190, 166</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 캡 45° 가장자리 (15,67)</td><td>95, 144, 131</td><td>95, 144, 131</td><td>0</td></tr>
+      <tr><td>토스트 413.6×32 · 캡 45° 아래쪽 (15,89)</td><td>129, 214, 187</td><td>129, 214, 187</td><td>0</td></tr>
+      <tr><td>토스트 413.6×32 · 바깥 그림자(바로 아래 +1) (216,94)</td><td>6, 6, 11</td><td>5, 5, 11</td><td>1</td></tr>
+      <tr><td>토스트 413.6×32 · 바깥 그림자(+3) (216,96)</td><td>11, 11, 19</td><td>11, 11, 19</td><td>0</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 면 가운데 (1202,25)</td><td>16, 23, 31</td><td>16, 23, 31</td><td>0</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 위 림 빛(위 변) (1202,8)</td><td>182, 169, 233</td><td>182, 169, 234</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 링 위 둘째 줄 (1202,9)</td><td>127, 107, 175</td><td>128, 107, 176</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 광택 띠(위에서 1/4) (1202,17)</td><td>18, 27, 36</td><td>18, 27, 35</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 아래 그늘(아래에서 3) (1202,38)</td><td>10, 11, 18</td><td>9, 11, 18</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 링 아래 (1202,41)</td><td>173, 144, 236</td><td>173, 144, 236</td><td>0</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 링 옆(왼쪽 캡 끝) (1030,25)</td><td>173, 144, 236</td><td>174, 144, 236</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 오른쪽 캡 끝 (1373,25)</td><td>173, 144, 236</td><td>174, 144, 236</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 캡 45° 가장자리 (1035,14)</td><td>70, 61, 99</td><td>70, 61, 100</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 캡 45° 아래쪽 (1035,36)</td><td>163, 135, 222</td><td>163, 136, 223</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 바깥 그림자(바로 아래 +1) (1202,42)</td><td>6, 6, 11</td><td>5, 5, 11</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 바깥 그림자(+3) (1202,44)</td><td>11, 11, 19</td><td>11, 11, 19</td><td>0</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 공유 반경 캡 끝 위(직선 2 단위 구간) (1030,24)</td><td>173, 144, 236</td><td>174, 144, 236</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 공유 반경 캡 위 모서리 (1033,11)</td><td>13, 13, 21</td><td>12, 12, 21</td><td>1</td></tr>
+      <tr><td>아키 칩 344×34 (r17→16 벌) · 공유 반경 캡 아래 모서리 (1033,38)</td><td>9, 9, 17</td><td>9, 9, 17</td><td>0</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 면 가운데 (1202,79)</td><td>16, 23, 31</td><td>16, 23, 31</td><td>0</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 위 림 빛(위 변) (1202,61)</td><td>182, 169, 233</td><td>182, 169, 234</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 링 위 둘째 줄 (1202,62)</td><td>67, 60, 96</td><td>67, 60, 97</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 광택 띠(위에서 1/4) (1202,70)</td><td>18, 27, 35</td><td>18, 27, 35</td><td>0</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 아래 그늘(아래에서 3) (1202,94)</td><td>8, 10, 17</td><td>8, 10, 16</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 링 아래 (1202,97)</td><td>6, 6, 11</td><td>5, 5, 11</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 링 옆(왼쪽 캡 끝) (1018,79)</td><td>173, 144, 236</td><td>174, 144, 236</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 오른쪽 캡 끝 (1386,79)</td><td>7, 7, 14</td><td>7, 7, 14</td><td>0</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 캡 45° 가장자리 (1023,67)</td><td>36, 38, 57</td><td>36, 38, 57</td><td>0</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 캡 45° 아래쪽 (1023,91)</td><td>151, 125, 208</td><td>152, 126, 207</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 바깥 그림자(바로 아래 +1) (1202,98)</td><td>7, 7, 13</td><td>7, 7, 13</td><td>0</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 바깥 그림자(+3) (1202,100)</td><td>13, 13, 21</td><td>12, 12, 21</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 공유 반경 캡 끝 위(직선 2 단위 구간) (1018,78)</td><td>173, 144, 236</td><td>174, 144, 236</td><td>1</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 공유 반경 캡 위 모서리 (1021,64)</td><td>12, 12, 21</td><td>12, 12, 21</td><td>0</td></tr>
+      <tr><td>아키 칩 펄스 368.08×36.38 · 공유 반경 캡 아래 모서리 (1021,93)</td><td>9, 9, 16</td><td>9, 9, 16</td><td>0</td></tr>
+      <tr><td>NEW 28×16 일반 · 면 가운데 (1414,24)</td><td>141, 147, 158</td><td>141, 147, 158</td><td>0</td></tr>
+      <tr><td>NEW 28×16 일반 · 위 림 빛(위 변) (1414,16)</td><td>168, 178, 189</td><td>169, 177, 189</td><td>1</td></tr>
+      <tr><td>NEW 28×16 일반 · 아래 그늘(아래에서 3) (1414,28)</td><td>131, 136, 147</td><td>131, 136, 147</td><td>0</td></tr>
+      <tr><td>NEW 28×16 일반 · 아래 변 (1414,31)</td><td>109, 113, 122</td><td>109, 113, 122</td><td>0</td></tr>
+      <tr><td>NEW 28×16 일반 · 왼쪽 캡 끝 (1400,24)</td><td>140, 146, 157</td><td>140, 146, 157</td><td>0</td></tr>
+      <tr><td>NEW 28×16 일반 · 캡 45° 가장자리 (1402,19)</td><td>154, 162, 173</td><td>155, 162, 173</td><td>1</td></tr>
+      <tr><td>NEW 28×16 일반 · 캡 45° 아래쪽 (1402,29)</td><td>113, 116, 127</td><td>112, 117, 126</td><td>1</td></tr>
+      <tr><td>NEW 28×16 일반 · 바깥 그림자(바로 아래 +1) (1414,32)</td><td>6, 6, 11</td><td>5, 5, 11</td><td>1</td></tr>
+      <tr><td>NEW 28×16 일반 · 바깥 그림자(+3) (1414,34)</td><td>11, 11, 19</td><td>11, 11, 19</td><td>0</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 면 가운데 (1466,23)</td><td>224, 152, 31</td><td>224, 152, 30</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 위 림 빛(위 변) (1466,14)</td><td>229, 180, 133</td><td>229, 179, 133</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 아래 그늘(아래에서 3) (1466,28)</td><td>206, 139, 28</td><td>207, 139, 27</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 아래 변 (1466,31)</td><td>173, 116, 21</td><td>173, 116, 21</td><td>0</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 왼쪽 캡 끝 (1450,23)</td><td>224, 152, 31</td><td>224, 152, 30</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 캡 45° 가장자리 (1453,17)</td><td>233, 158, 32</td><td>233, 158, 32</td><td>0</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 캡 45° 아래쪽 (1453,29)</td><td>197, 133, 26</td><td>198, 133, 25</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 바깥 그림자(바로 아래 +1) (1466,32)</td><td>6, 6, 11</td><td>5, 5, 11</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 바깥 그림자(+3) (1466,34)</td><td>11, 11, 19</td><td>11, 11, 19</td><td>0</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 공유 반경 캡 끝 위(직선 2 단위 구간) (1450,22)</td><td>224, 152, 31</td><td>224, 152, 30</td><td>1</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 공유 반경 캡 위 모서리 (1453,17)</td><td>233, 158, 32</td><td>233, 158, 32</td><td>0</td></tr>
+      <tr><td>NEW 32×18 전설 (r9→8 벌) · 공유 반경 캡 아래 모서리 (1453,28)</td><td>206, 139, 28</td><td>207, 139, 27</td><td>1</td></tr>
+      <tr><td>NEW 28×16 영웅 · 면 가운데 (1414,78)</td><td>152, 76, 224</td><td>152, 76, 224</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 위 림 빛(위 변) (1414,70)</td><td>176, 139, 237</td><td>176, 139, 237</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 아래 그늘(아래에서 3) (1414,82)</td><td>141, 70, 208</td><td>141, 70, 208</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 아래 변 (1414,85)</td><td>117, 57, 174</td><td>117, 57, 174</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 왼쪽 캡 끝 (1400,78)</td><td>151, 75, 222</td><td>151, 76, 222</td><td>1</td></tr>
+      <tr><td>NEW 28×16 영웅 · 캡 45° 가장자리 (1402,73)</td><td>165, 103, 234</td><td>164, 103, 234</td><td>1</td></tr>
+      <tr><td>NEW 28×16 영웅 · 캡 45° 아래쪽 (1402,83)</td><td>121, 60, 180</td><td>121, 60, 180</td><td>0</td></tr>
+      <tr><td>NEW 28×16 영웅 · 바깥 그림자(바로 아래 +1) (1414,86)</td><td>6, 6, 11</td><td>5, 5, 11</td><td>1</td></tr>
+      <tr><td>NEW 28×16 영웅 · 바깥 그림자(+3) (1414,88)</td><td>11, 11, 19</td><td>11, 11, 19</td><td>0</td></tr>
+      <tr><td>전 픽셀 1540×110</td><td colspan="2">평균 차 0.300 · 차 &gt; 3 인 픽셀 0개 · 차 &gt; 8 인 픽셀 0개 · 최대 2</td><td>표본 138곳 최대 1</td></tr>
+      <!--/ENGINE-REC-->
+    </table></div>
+    <p class="hint" id="engine-rec-hint">전 픽셀 최대 <!--ENGINE-REC-MAX-->2<!--/ENGINE-REC-MAX-->/255이고 차가 3을 넘는 픽셀은 없습니다. 고친 것은 없습니다(게임도 목업도 그대로). 반경 벌을 공유하는 두 곳(아키 토큰 칩 높이 34 → 반경 16 벌 · 뽑기 서랍 NEW 높이 18 → 반경 8 벌)과 소수 좌표로 커진 펄스 칩도 같은 범위입니다. 장식 세기는 광택 레이어에도 곱해지지만 광택과 피버가 함께 있는 알약이 없어, 광택 없는 FEVER(세기 100% · 50%)와 광택 있는 세 알약(보물티켓 · 토스트 · 아키 토큰 칩)이 각각 목업과 맞습니다. 대조가 차이를 실제로 잡는지는 목업만 ④ 발광을 켜서 확인했습니다(차 &gt; 3인 픽셀 3,094개 · 최대 71).</p>
+  </section>
+
+  <section aria-labelledby="s7">
+    <h2 id="s7">포팅하면 바뀌는 것</h2>
+    <div class="tbl"><table class="m l">
+      <tr><th>구분</th><th>자리(심볼)</th><th>크기 · 반경</th><th>판정과 이유</th></tr>
+      <tr><td>들어감 1</td><td>런 HUD 아키 토큰 칩 <code>RunHudView.BuildArchTokenPanel</code></td><td>344×34 r17 · 링 1.35 · 획득 때 ×1.07 펄스</td><td>런 내내 보임. 반경 16 벌 공유. 묶음 3(카드)에서 반경 17이라 빠졌던 자리</td></tr>
+      <tr><td>들어감 2</td><td>런 HUD 온보딩 토스트 <code>RunHudView.BuildOnboardingToast</code></td><td>914×32 r16 · 링 1 · 반투명 면</td><td>반경 16 벌. 통째 페이드(<code>CanvasGroup</code>)라 레이어가 늘어도 같이 사라짐</td></tr>
+      <tr><td>들어감 3</td><td>FEVER 배지 <code>RunFxView.BuildFeverOverlay</code></td><td>200×38 r19 · 링 1.5</td><td>반경 19 벌. 면·링 알파가 피버 세기로 매 프레임 바뀜 → 장식 레이어(그림자·그늘·광택·림)도 같은 세기를 곱해야 함(호출부 한 줄 추가)</td></tr>
+      <tr><td>들어감 4</td><td>장비 탭 보물티켓 배지 <code>EquipmentView.BuildHeader</code></td><td>(글자 폭+16, 최소 72)×32 r16 · 링 1</td><td>반경 16 벌. 폭은 지금처럼 코드가 글자에서 잼</td></tr>
+      <tr><td>들어감 5</td><td>런 결과 NEW BEST 배지 <code>RunResultOverlayView</code>(<code>MainMenuOverlayViews.cs</code>)</td><td>196×24 r12 · 링 1 · 면 없음</td><td>반경 12 벌. 링만 있는 변형 — 링과 상단 림 빛만 씀(면·그늘·광택·그림자 없음)</td></tr>
+      <tr><td>들어감 6</td><td>젬 타일 NEW 뱃지 <code>SocketsView.GemInventoryTile</code></td><td>28×16 r8(뽑기 서랍 ×1.15 = 32×18 r9) · 링 없음</td><td>반경 8 벌(18은 공유). 면 색 = 젬 등급색(신화는 매 프레임 무지개) — 색 입히기 그대로</td></tr>
+      <tr><td>제외 1</td><td>설정 슬라이더 손잡이 <code>SettingsView.BuildSlider</code></td><td>27×36 r13</td><td>상호작용 부품(끌 수 있는 손잡이). 묶음 3·5에서도 제외. 세로로 긴 알약이라 위·아래가 캡</td></tr>
+      <tr><td>제외 2</td><td>스크롤바 트랙 2곳 <code>GemFusionView</code> · <code>SocketsView.GemInventoryBand</code></td><td>폭 18 r9 · 세로</td><td>스크롤 부품. 묶음 5에서 「따로 다룰 묶음」으로 미룸</td></tr>
+      <tr><td>제외 3</td><td>장비 세대 교체 틱 트랙 <code>EquipmentView.GenerationSwapLayer</code></td><td>높이 4 r2</td><td>진행바 계열(묶음 5에서 제외 — 반경 2는 요소를 넣을 자리가 없음)</td></tr>
+      <tr><td>제외 4</td><td>원형 점 — 연구소 탭·개요 카드 빨간 점 · 테마 점 · 등급 점 · 무기 소켓 강조 링</td><td>8×8 r4 · 10×10 r5 · r2 · 지름 15.55 r7</td><td>폭 = 높이인 원. 늘어나는 구간이 없어 알약 문법(캡 + 몸통)이 아님. 8단위 점에 림·그늘을 넣으면 뭉개짐</td></tr>
+      <tr><td>제외 5</td><td>둥근 사각 칩·배지 — 장비 시대 배지(18 r8) · 세대 교체 칩(34 r8) · 무기 모양 뱃지(18 r6) · 메인메뉴 배지(24 r7) · 젬 필터 칩(24 r8) · 합성 후보 칩(30 r7) · 버프 큐 칸(r7) · 도전과제 배지(40 r8)</td><td>반경 &lt; 높이의 절반</td><td>알약이 아니라 모서리만 둥근 사각형. 색·테두리 두께를 호출부가 갈아끼우는 상호작용 칩이 섞여 있음 → 「칩」 묶음으로 따로(이번엔 무변경)</td></tr>
+      <tr><td>겹침 없음</td><td>알약 버튼</td><td>—</td><td><code>NewButton</code>에 반경 11 초과를 주는 호출은 <b>0건</b>. 메인메뉴 맵 레벨 칩(38 r11) · 장비 다시뽑기/넘기기(22 r8)는 이미 묶음 1 버튼 레시피를 탐</td></tr>
+      <tr><td>겹침 없음</td><td>연구소 탭 배지</td><td>—</td><td>바탕 그림이 없는 금색 글자(<code>LabShellView.BuildTabSignals</code>)</td></tr>
+      <tr><td>범위 밖</td><td>IMGUI(스킬트리 그래프 · 런 와이프) · 월드 스프라이트</td><td>—</td><td>레시피는 Canvas <code>Image</code> 대상</td></tr>
+    </table></div>
+    <div class="notes">
+      <div class="note"><h3>그대로 두는 것</h3>
+        <ul><li>알약의 위치 · 폭 · 높이 · 글자 · 폭을 재는 코드</li>
+          <li>면 색 · 테두리 색 토큰과, 호출부가 색을 바꾸는 코드(등급색 · 피버 세기 · 토스트 페이드). 신규 색 0</li>
+          <li>표시 전용(클릭 대상 아님) — 여섯 곳 모두 지금도 표시 전용입니다</li></ul></div>
+      <div class="note"><h3>바뀌는 것</h3>
+        <ul><li>면·링이 구운 그림을 씁니다(2텍셀/단위라 가장자리가 더 또렷). 켠 요소마다 레이어가 하나씩 늘어납니다</li>
+          <li>아키 토큰 칩과 온보딩 토스트의 세로 그라디언트·직선 빛 줄(<code>Elevate</code>)이 「② 면 광택」으로 바뀝니다(같은 토큰 <code>SurfaceRaisedTopColor</code> · 같은 세로 그라디언트). 지금의 직선 빛 줄은 양 끝이 캡 곡선 밖으로 1단위 가까이 삐져나옵니다. 보물티켓 배지는 같은 광택이 새로 생깁니다</li>
+          <li>색 면(NEW 등급색 · FEVER)은 아래 변 쪽이 최대 17% 어두워집니다(위 변은 호출부 색 그대로)</li>
+          <li>링 두께: 1.35(아키 토큰 칩)는 1.5로 맞춥니다. 1(나머지)과 1.5(FEVER)는 그대로</li>
+          <li>높이 34(아키 토큰 칩)와 18(뽑기 서랍 NEW)은 한 치수 작은 반경 그림을 씁니다(⑤)</li></ul></div>
+      <div class="note"><h3>정본과 다른 점(참고)</h3>
+        <ul><li><code>ui-prototype.html</code>의 <code>.chip</code>(재화 칩)은 색 면 + 1px 테두리의 작은 알약 세 개(골드 · 인사이트 · 커밋)입니다. 구현의 런 HUD는 골드가 둥근 패널(60 높이)이고 알약은 아키 토큰 칩 하나뿐입니다. 구현 칩의 면은 어두운 패널색 + 보라 테두리입니다</li>
+          <li>정본 FEVER 배지는 주황 글자 + 1px 테두리 + 가운데 정렬 + 넓은 자간입니다. 구현은 흰 글자(<code>TextTitleColor</code>) + 1.5 테두리 + 왼쪽 위 정렬입니다</li>
+          <li>정본 NEW BEST는 구현과 같습니다(금색 1px 알약 테두리 · 면 없음 · 폭 196)</li>
+          <li>정본에는 보물티켓 배지 · 젬 타일 NEW 뱃지 · 온보딩 토스트의 단품이 없습니다(구현에만 있음)</li>
+          <li>정본의 <code>.tag</code>는 반경 8 둥근 사각형(알약 아님)입니다</li>
+          <li>2026-10-03 포팅과 함께 정본의 해당 절(재화 <code>.chip</code> · FEVER 배지 · NEW BEST · 온보딩 토스트 · 보물티켓 배지 · 젬 NEW 뱃지)을 구현에 맞게 고쳤습니다</li></ul></div>
+    </div>
+  </section>
+
+  <section class="ask" aria-labelledby="s8">
+    <h2 id="s8">owner 판정 (2026-10-03)</h2>
+    <p>원문: <i>"강조발광 뭐가 달라지는지 모르겠는데.. 1a, 2a, 3a, 4 잘 모르겠음, 5는.. a, 6a 전부!"</i> ⇒ <code>1a 2a 3a 4b 5a 6a</code>. 질감 세기는 앞 묶음과 같은 ×1.25입니다.</p>
+    <ol id="asks">
+      <li><b>입체감(①)</b> — <b class="rec">넣는다</b>. 알약 위쪽 가장자리에 밝은 빛 한 줄, 아래쪽 안에 옅은 그늘</li>
+      <li><b>면 광택(②)</b> — <b class="rec">넣는다</b>. 어두운 면(아키 토큰 칩 · 토스트 · 보물티켓)은 광택 레이어, 색 면(NEW · FEVER)은 아래로 갈수록 살짝 어둡게. 런 HUD 칩과 토스트의 직선 빛 줄(<code>Elevate</code>)은 없어지고 광택이 캡 모양을 따라갑니다</li>
+      <li><b>바깥 그림자(③)</b> — <b class="rec">넣는다</b>. 면이 있는 알약 아래에 옅은 그림자(링만 있는 NEW BEST에는 없음)</li>
+      <li><b>강조 발광(④)</b> — <b class="rec">안 넣는다</b>. owner가 켠 것과 끈 것의 차이를 느끼지 못해 추천안(끔)으로 정했습니다. 위 체크박스는 비교용으로만 남겼고 게임에는 발광 그림이 없습니다</li>
+      <li><b>굽는 그림 벌 수(⑤)</b> — <b class="rec">같이 쓴다 — 네 벌</b>(반경 19 · 16 · 12 · 8). 높이 34와 18은 한 치수 작은 그림을 씁니다. 반경 차가 1보다 크면 지금 방식(절차식)으로 그립니다</li>
+      <li><b>범위</b> — <b class="rec">표의 6곳 전부</b>. 런 HUD 아키 토큰 칩 · 온보딩 토스트 · FEVER 배지 · 장비 보물티켓 배지 · 런 결과 NEW BEST · 젬 타일 NEW 뱃지</li>
+    </ol>
+    <p>게임 구현: <code>CanvasUi.PillBadge</code> + 손잡이 컴포넌트 <code>RecipePillBadge</code>(면·링 색 대상 · 장식 세기 · 반경 공유 판정). 굽는 쪽: recipe-art <code>ui_pill</code> 드로어(v0.9.0 · 반경 19 · 16 · 12 · 8 · 7칸 · 발광 없음).</p>
+  </section>
+</div>
+
+<script src="ui-recipe-card-bake.js"></script>
+<script src="ui-recipe-pill-bake.js"></script>
+<script>
+(function () {
+  'use strict';
+  // ── 게임 토큰 — Assets/Resources/UI/UiTheme.asset 의 값 그대로(0..1 실수 · RGBA). 신규 색 0.
+  //    검증 스크립트가 이 블록을 UiTheme.asset 과 대조한다(드리프트면 실패) — 손으로 고치지 말 것.
+  var THEME = /*THEME*/{
+    RunHudPanelColor: [0.039, 0.063, 0.09, 1],
+    RunHudGoldPanelBorderColor: [0.92, 0.76, 0.28, 0.88],
+    RunHudArchTokenPanelBorderColor: [0.72, 0.6, 0.98, 0.88],
+    RunIntroBannerColor: [0.02, 0.05, 0.08, 0.76],
+    RunIntroBannerBorderColor: [0.58, 0.96, 0.84, 0.82],
+    RunFeverBadgeColor: [0.22, 0.08, 0.03, 0.82],
+    FeverThemeColor: [1, 0.42, 0.18, 1],
+    OverlayPanelColor: [0.039, 0.063, 0.09, 1],
+    OverlayShellHeaderColor: [0.05, 0.09, 0.12, 0.96],
+    OverlayShellHeaderOutlineColor: [0.13, 0.21, 0.28, 0.92],
+    CardSurfaceColor: [0.039, 0.063, 0.09, 1],
+    SurfaceRaisedTopColor: [0.086, 0.125, 0.173, 1],
+    kChestNodeTint: [0.788, 0.635, 0.153, 1],
+    MenuGoldTextColor: [1, 0.86, 0.24, 1],
+    MenuCursorColor: [0.34, 0.82, 0.72, 1],
+    TextTitleColor: [0.918, 0.953, 0.949, 1],
+    TextBtnColor: [0.788, 0.839, 0.886, 1],
+    TextCaptionColor: [0.725, 0.776, 0.827, 1],
+    GemGradeCommonColor: [0.612, 0.639, 0.686, 1],
+    GemGradeRareColor: [0.231, 0.51, 0.965, 1],
+    GemGradeEpicColor: [0.659, 0.333, 0.969, 1],
+    GemGradeLegendaryColor: [0.961, 0.651, 0.137, 1]
+  }/*END*/;
+  var FIELD_BG = [12 / 255, 22 / 255, 33 / 255, 1];   // 런 화면 바탕 자리 표시 #0c1621(카드 목업 --field-surface · 토큰 아님)
+  function tk(name, alpha) { var c = THEME[name]; return [c[0], c[1], c[2], alpha == null ? c[3] : alpha]; }
+  var WHITE = [1, 1, 1, 1];
+  function withA(c, k) { return [c[0], c[1], c[2], c[3] * k]; }
+  function hexOf(c) { return '#' + [0, 1, 2].map(function (i) { return ('0' + Math.round(c[i] * 255).toString(16)).slice(-2); }).join(''); }
+
+  // ── 엔진이 색을 다루는 방식(묶음 4 가 엔진 캡처로 확인한 3가지 — 현행·레시피 공통. 목업 = 게임):
+  //   ① 틴트(Image.color)는 **리니어에서** 텍스처에 곱해진다.
+  //   ② uGUI 는 색을 Color32 로 만든 뒤 **리니어 8비트로 반올림**해 정점에 싣는다 ⇒ 아주 어두운 색은 계단이 굵다(#0a1017 → 화면 #0d0d16).
+  //   ③ 텍스처 없는 사각형은 **픽셀 중심이 안에 든 칸만** 칠한다(안티에일리어싱 없음). 스프라이트 쿼드의 가장자리도 같다.
+  var LIN = new Float32Array(256);
+  for (var li = 0; li < 256; li++) { var lc = li / 255; LIN[li] = lc <= 0.04045 ? lc / 12.92 : Math.pow((lc + 0.055) / 1.055, 2.4); }
+  function toSrgb8(l) { var c = l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(l, 1 / 2.4) - 0.055; return Math.round(Math.max(0, Math.min(1, c)) * 255); }
+  var QUANT = true;   // ?quant=0 으로 끄면 양자화 없는 대조 실행
+  /** 색(0..1 sRGB RGBA) → 정점에 실리는 리니어 RGB + 알파(Color32 반올림) */
+  function tintLin(c) {
+    var o = [0, 1, 2].map(function (i) { var b = Math.round(Math.max(0, Math.min(1, c[i])) * 255); return QUANT ? Math.round(LIN[b] * 255) / 255 : LIN[b]; });
+    o.push(Math.round((c[3] == null ? 1 : c[3]) * 255) / 255);
+    return o;
+  }
+  function shownCss(c) { var t = tintLin(c); return 'rgb(' + toSrgb8(t[0]) + ',' + toSrgb8(t[1]) + ',' + toSrgb8(t[2]) + ')'; }
+
+  // ═════ 실수 버퍼 합성기 — 리니어 RGB 를 Float32 로 쌓고 마지막에 한 번만 8비트로 내린다(묶음 5 와 같은 구조) ═════
+  function Buf(w, h, bg) {
+    var n = w * h, t = tintLin(bg);
+    this.w = w; this.h = h; this.r = new Float32Array(n).fill(t[0]); this.g = new Float32Array(n).fill(t[1]); this.b = new Float32Array(n).fill(t[2]);
+  }
+  Buf.prototype.toCanvas = function (zoom) {
+    var c = document.createElement('canvas'); c.width = this.w; c.height = this.h;
+    var x = c.getContext('2d'), img = x.createImageData(this.w, this.h), o = img.data;
+    for (var k = 0, j = 0; k < this.w * this.h; k++, j += 4) { o[j] = toSrgb8(this.r[k]); o[j + 1] = toSrgb8(this.g[k]); o[j + 2] = toSrgb8(this.b[k]); o[j + 3] = 255; }
+    x.putImageData(img, 0, 0);
+    c.className = 'px'; c.style.width = (this.w * (zoom || 1)) + 'px'; c.style.height = (this.h * (zoom || 1)) + 'px';
+    return c;
+  };
+  /** 굽기 결과(straight RGBA 8비트 · 위→아래)의 한 칸을 표본용 텍스처로. GPU 처럼 RGB 는 리니어로 풀어 두고 알파는 따로. */
+  function makeTex(data, stride, sx, w, h) {
+    var lin = new Float32Array(w * h * 3), al = new Float32Array(w * h);
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+      var si = (y * stride + sx + x) * 4, di = y * w + x;
+      lin[di * 3] = LIN[data[si]]; lin[di * 3 + 1] = LIN[data[si + 1]]; lin[di * 3 + 2] = LIN[data[si + 2]]; al[di] = data[si + 3] / 255;
+    }
+    return { W: w, H: h, lin: lin, a: al, raw: { data: data, stride: stride, sx: sx } };
+  }
+  // 9-slice 한 축: 목적 좌표 u(0..D) → 텍셀 좌표. bA/bB = 목적 쪽 경계(px) · tA/tB = 텍셀 경계 · n = 텍셀 길이
+  function axis(u, D, bA, bB, tA, tB, n) {
+    if (bA > 0 && u < bA) return u / bA * tA;
+    if (bB > 0 && u > D - bB) return n - (D - u) / bB * tB;
+    var mid = D - bA - bB; return mid <= 0 ? tA : tA + (u - bA) / mid * (n - tA - tB);
+  }
+  /**
+   * Unity Image.Type.Sliced 한 장을 버퍼에 얹는다(SrcAlpha · OneMinusSrcAlpha · 리니어).
+   * @param upt 텍셀 하나가 차지하는 목적 px(절차식 1 · 레시피 1/TX)   @param bt 텍셀 경계 [L, T, R, B]
+   * 경계 합이 목적 크기를 넘으면 Unity 처럼 그 축의 두 경계를 같은 비율로 눌러 담는다. 쿼드 가장자리는 픽셀 중심 판정.
+   */
+  function blit(buf, tex, dx, dy, dw, dh, upt, bt, color) {
+    if (dw <= 0 || dh <= 0) return;
+    var t = tintLin(color), alpha = t[3];
+    var bL = bt[0] * upt, bT = bt[1] * upt, bR = bt[2] * upt, bB = bt[3] * upt, s;
+    if (bL + bR > dw) { s = dw / (bL + bR); bL *= s; bR *= s; }
+    if (bT + bB > dh) { s = dh / (bT + bB); bT *= s; bB *= s; }
+    var xa = Math.max(0, Math.ceil(dx - 0.5)), xb = Math.min(buf.w, Math.ceil(dx + dw - 0.5));
+    // 세로 동률(픽셀 중심이 정확히 변 위): 엔진 캡처(RenderTexture)에서는 아래 변이 포함 · 위 변이 제외다 — 정수 y 에 놓인 1.5 단위 줄(Elevate 의 TopRim)이 두 행을 먹는다(2026-10-03 실측).
+    var ya = Math.max(0, Math.floor(dy - 0.5) + 1), yb = Math.min(buf.h, Math.floor(dy + dh - 0.5) + 1);
+    if (xb <= xa || yb <= ya) return;
+    var W = tex.W, H = tex.H, txs = new Float32Array(xb - xa), x, y;
+    for (x = xa; x < xb; x++) txs[x - xa] = axis(x + 0.5 - dx, dw, bL, bR, bt[0], bt[2], W);
+    for (y = ya; y < yb; y++) {
+      var fy = Math.min(Math.max(axis(y + 0.5 - dy, dh, bT, bB, bt[1], bt[3], H) - 0.5, 0), H - 1);
+      var iy = Math.min(Math.floor(fy), Math.max(0, H - 2)), wy = fy - iy, iy1 = Math.min(iy + 1, H - 1);
+      for (x = xa; x < xb; x++) {
+        var fx = Math.min(Math.max(txs[x - xa] - 0.5, 0), W - 1);
+        var ix = Math.min(Math.floor(fx), Math.max(0, W - 2)), wx = fx - ix, ix1 = Math.min(ix + 1, W - 1);
+        var p00 = iy * W + ix, p10 = iy * W + ix1, p01 = iy1 * W + ix, p11 = iy1 * W + ix1;
+        var w00 = (1 - wx) * (1 - wy), w10 = wx * (1 - wy), w01 = (1 - wx) * wy, w11 = wx * wy;
+        var a = (tex.a[p00] * w00 + tex.a[p10] * w10 + tex.a[p01] * w01 + tex.a[p11] * w11) * alpha;
+        if (a <= 0) continue;
+        var L = tex.lin, ia = 1 - a, q = y * buf.w + x;
+        buf.r[q] = (L[p00 * 3] * w00 + L[p10 * 3] * w10 + L[p01 * 3] * w01 + L[p11 * 3] * w11) * t[0] * a + buf.r[q] * ia;
+        buf.g[q] = (L[p00 * 3 + 1] * w00 + L[p10 * 3 + 1] * w10 + L[p01 * 3 + 1] * w01 + L[p11 * 3 + 1] * w11) * t[1] * a + buf.g[q] * ia;
+        buf.b[q] = (L[p00 * 3 + 2] * w00 + L[p10 * 3 + 2] * w10 + L[p01 * 3 + 2] * w01 + L[p11 * 3 + 2] * w11) * t[2] * a + buf.b[q] * ia;
+      }
+    }
+  }
+
+  // ═════ 현행 = CanvasUi 절차식(텍스처를 C# 과 같은 식으로 만든다) ═════
+  //   RoundedFill(r): (2r+2)² 흰색 · 알파 = CornerAlpha · 네 변 경계 r · ppu 100(1 텍셀 = 1 단위)
+  //   RoundedRing(r, t): 같은 크기 · 알파 = clamp(outer − inner(t))
+  //   RoundedFade(r): 같은 크기 · 알파 = CornerAlpha × (아래 0 → 위 1)^1.15 · 경계 좌우만 r(세로는 통째로 늘어난다) — Elevate 의 Sheen
+  function cornerAlpha(x, y, size, radius, inset) {
+    inset = inset || 0;
+    var px = x + 0.5, py = y + 0.5, min = inset, max = size - inset;
+    if (px < min || py < min || px > max || py > max) return 0;
+    var r = Math.max(0, radius - inset);
+    var cx = px < min + r ? min + r : (px > max - r ? max - r : px);
+    var cy = py < min + r ? min + r : (py > max - r ? max - r : py);
+    return Math.max(0, Math.min(1, r - Math.hypot(px - cx, py - cy) + 0.5));
+  }
+  var procCache = {};
+  function procTex(radius, ringT, fade) {
+    radius = Math.max(2, Math.min(64, radius));
+    var key = radius + ':' + (ringT || 0) + ':' + (fade ? 1 : 0); if (procCache[key]) return procCache[key];
+    var size = radius * 2 + 2, d = new Uint8Array(size * size * 4), th = ringT ? Math.max(1, Math.min(ringT, radius)) : 0;
+    for (var y = 0; y < size; y++) for (var x = 0; x < size; x++) {
+      var a = cornerAlpha(x, y, size, radius); if (ringT) a = Math.max(0, Math.min(1, a - cornerAlpha(x, y, size, radius, th)));
+      if (fade) a *= Math.pow((size - 1 - y) / (size - 1), 1.15);   // Unity 텍스처 y=0 이 아래 — 여기 행 y 는 위에서 잰다
+      var o = (y * size + x) * 4; d[o] = d[o + 1] = d[o + 2] = 255; d[o + 3] = Math.round(a * 255);
+    }
+    var t = makeTex(d, size, 0, size, size); t.b = fade ? [radius, 0, radius, 0] : [radius, radius, radius, radius];
+    return (procCache[key] = t);
+  }
+  function fillProc(buf, x, y, w, h, r, color) { var t = procTex(r); blit(buf, t, x, y, w, h, 1, t.b, color); }
+  function ringProc(buf, x, y, w, h, r, th, color) { var t = procTex(r, th); blit(buf, t, x, y, w, h, 1, t.b, color); }
+  var SOLID = makeTex(new Uint8Array([255, 255, 255, 255]), 1, 0, 1, 1);
+  function rectFill(buf, x, y, w, h, color) { blit(buf, SOLID, x, y, w, h, 1, [0, 0, 0, 0], color); }   // 텍스처 없는 Image — 픽셀 중심 스냅
+  /** CanvasUi.Elevate(image, r): Sheen(RoundedFade · SurfaceRaisedTop) + TopRim(위 1.5 단위 · 좌우 0.6r 물림 · TextBtn α.24) */
+  function elevateProc(buf, x, y, w, h, r) {
+    var t = procTex(r, 0, true); blit(buf, t, x, y, w, h, 1, t.b, tk('SurfaceRaisedTopColor'));
+    rectFill(buf, x + r * 0.6, y, w - r * 1.2, 1.5, tk('TextBtnColor', 0.24));
+  }
+
+  // ═════ 레시피 = html/ui-recipe-pill-bake.js 를 잘라 틴트 → 9-slice ═════
+  var P = window.UiPillRecipe, TX = P.TX, PAD = P.PAD, K = 1.25;
+  var OPT = { bevel: true, gloss: true, shadow: true, glow: false, share: true };   // 기본값 = owner 판정(2026-10-03 `1a 2a 3a 4b 5a 6a`) = 게임
+  var recCache = {};
+  function recLayers(radius) {
+    var key = radius + ':' + K + ':' + OPT.gloss; if (recCache[key]) return recCache[key];
+    // 목업 시트 = 출하 7칸 + glow 한 칸(④ 토글 전용). 게임이 쓰는 출하 시트는 `P.bakeRecipes(radius, K).pill`(glow 없음 · 면 세로 밝기 켬)이고 앞 7칸의 픽셀 값은 같다
+    var sh = P.bakeSheet(radius, K, { volume: OPT.gloss, glow: true }), res = { b: sh.border, layer: {} };
+    sh.layers.forEach(function (n, l) { res.layer[n] = makeTex(sh.data, sh.W, l * sh.cellW, sh.cellW, sh.H); });
+    return (recCache[key] = res);
+  }
+
+  // ── 런 HUD 골드 패널 바탕 = 구운 카드(묶음 3 · CanvasUi.ElevateCard) — ui-recipe-card-bake.js 를 읽기만 한다. 순서는 카드 목업 drawRecipe 와 같다.
+  var C = window.UiCardRecipe, cardCache = {};
+  function cardLayers(radius) {
+    if (cardCache[radius]) return cardCache[radius];
+    var sh = C.bakeSheet(radius, 1.25, { rim: true, bevel: true }), res = { borders: sh.borders, layer: {} };
+    C.LAYERS.forEach(function (n, l) { res.layer[n] = makeTex(sh.data, sh.W, l * sh.cellW, sh.cellW, sh.H); });
+    var rp = C.bakeRamp(radius, 1.25); res.layer.ramp = makeTex(rp.data, rp.W, 0, rp.W, rp.H); res.rampB = rp.borderLR;
+    return (cardCache[radius] = res);
+  }
+  function drawCard(buf, x, y, w, h, r, fill, ring, ringTh) {
+    var L = cardLayers(r), cp = C.PAD, u = 1 / C.TX, dx = x - cp, dy = y - cp, dw = w + 2 * cp, dh = h + 2 * cp;
+    function put(n, c) { var b = L.borders[n]; blit(buf, L.layer[n], dx, dy, dw, dh, u, [b, b, b, b], c); }
+    put('shadow', WHITE); put('face', fill);
+    blit(buf, L.layer.ramp, x, y, w, h, u, [L.rampB, 0, L.rampB, 0], tk('SurfaceRaisedTopColor'));
+    put('sheen', tk('TextBtnColor'));
+    if (Math.min(w, h) >= 2 * (r + C.CORNER_RUN)) put('corner', tk('TextBtnColor', 0.35));
+    if (ring) ringProc(buf, x, y, w, h, r, ringTh, ring);
+  }
+
+  // ═════ 알약 정의 — 호출부 값 그대로(주석 = 심볼) ═════
+  //   w·h = rect · r = 호출부가 주는 반경(없으면 PillRadius(h)) · face/ring = 색 · ringT = 링 두께 · elevate = 현행에 절차식 Elevate 가 얹히는가
+  //   gloss = 어두운 패널색 면이라 「② 면 광택」 레이어(SurfaceRaisedTop)를 얹는가(색 면은 face 의 세로 밝기만) · accent = 「④ 강조 발광」 대상 · surface = 놓이는 면(표 바탕)
+  var PILLS = /*PILLS*/{
+    arch: { name: '런 HUD · 아키 토큰 칩', sub: 'RunHudView.BuildArchTokenPanel · 344×34 r17 · 링 1.35', w: 344, h: 34, r: 17, face: 'RunHudPanelColor', ring: 'RunHudArchTokenPanelBorderColor', ringT: 1.35, elevate: true, gloss: true, surface: 'field' },
+    toast: { name: '런 HUD · 온보딩 토스트', sub: 'RunHudView.BuildOnboardingToast · 914×32 r16 · 링 1', w: 913.6, h: 32, face: 'RunIntroBannerColor', ring: 'RunIntroBannerBorderColor', ringT: 1, elevate: true, gloss: true, surface: 'field' },
+    fever: { name: 'FEVER 배지', sub: 'RunFxView.BuildFeverOverlay · 200×38 r19 · 링 1.5', w: 200, h: 38, face: 'RunFeverBadgeColor', faceA: 0.82, ring: 'FeverThemeColor', ringA: 0.34, ringT: 1.5, accent: true, pulse: true, surface: 'field' },
+    ticket: { name: '장비 · 보물티켓 배지', sub: 'EquipmentView.BuildHeader · (글자+16)×32 r16 · 링 1', w: 72, h: 32, face: 'OverlayPanelColor', ring: 'kChestNodeTint', ringA: 0.95, ringT: 1, gloss: true, surface: 'OverlayShellHeaderColor' },
+    best: { name: '런 결과 · NEW BEST', sub: 'RunResultOverlayView · 196×24 r12 · 링만', w: 196, h: 24, ring: 'MenuGoldTextColor', ringT: 1, accent: true, surface: 'OverlayPanelColor' },
+    newb: { name: '젬 타일 · NEW 뱃지', sub: 'SocketsView.GemInventoryTile · 28×16 r8 · 면 = 등급색 α.95', w: 28, h: 16, face: 'GemGradeCommonColor', faceA: 0.95, accent: true, surface: 'CardSurfaceColor' }
+  }/*END*/;
+  function pillRadius(h) { return Math.max(2, Math.min(64, Math.floor(h * 0.5))); }
+  /**
+   * 알약 하나. kind = 'cur' | 'rec' · o = { w, h, s(피버 세기 0..1 · 기본 1), face(면 토큰 덮어쓰기) }
+   * 레시피 합성 순서(= 게임 `CanvasUi.PillBadge` 의 레이어 순서): shadow → (glow — 목업 토글 전용 · 게임에 없음) → face → shade → gloss → ring|ringThick → rim
+   */
+  function drawPill(buf, kind, def, x, y, o) {
+    o = o || {};
+    var w = o.w || def.w, h = o.h || def.h, s = o.s == null ? 1 : o.s;
+    var r = o.h ? pillRadius(h) : (def.r || pillRadius(h));
+    if (def.r && o.h) r = def.r;   // 아키 토큰 칩: 반경은 상수 17(펄스로 커져도 그대로)
+    var faceTok = o.face || def.face;
+    var face = faceTok ? tk(faceTok, def.faceA != null ? def.faceA * (def.pulse ? s : 1) : null) : null;
+    var ring = def.ring ? tk(def.ring, def.ringA != null ? def.ringA * (def.pulse ? s : 1) : null) : null;
+    var rr = OPT.share ? P.recipeRadius(r) : r;
+    if (kind === 'cur' || !rr) {
+      if (face) fillProc(buf, x, y, w, h, r, face);
+      if (def.elevate) elevateProc(buf, x, y, w, h, r);
+      if (ring) ringProc(buf, x, y, w, h, r, def.ringT, ring);
+      return;
+    }
+    var R = recLayers(rr), u = 1 / TX, b = [R.b, R.b, R.b, R.b];
+    var put = function (n, c) { blit(buf, R.layer[n], x - PAD, y - PAD, w + 2 * PAD, h + 2 * PAD, u, b, c); };
+    var decor = def.pulse ? s : 1;   // 피버 배지: 장식 레이어도 피버 세기를 곱한다
+    if (face && OPT.shadow) put('shadow', [1, 1, 1, decor]);
+    if (OPT.glow && def.accent) put('glow', withA(ring || face, 0.8));
+    if (face) {
+      put('face', face);
+      if (OPT.bevel) put('shade', [1, 1, 1, decor]);
+      if (OPT.gloss && def.gloss) put('gloss', tk('SurfaceRaisedTopColor'));
+    }
+    if (ring) put(P.ringLayer(def.ringT), ring);
+    if (OPT.bevel) put('rim', tk('TextBtnColor', decor));
+  }
+
+  // ═════ 장면 ═════
+  var TICKETS = [0, 7, 42, 128, 1024, 20480, 999999, 12345678], NIDX = 2;
+  var measureCtx = document.createElement('canvas').getContext('2d');
+  function fontOf(size, bold, ui) { return (bold ? 'bold ' : '') + size + 'px ' + (ui ? 'Jua, ' : 'Pretendard, ') + '"Malgun Gothic", "Apple SD Gothic Neo", sans-serif'; }
+  function ticketText() { return '보물티켓 ' + TICKETS[NIDX]; }
+  function ticketWidth() { measureCtx.font = fontOf(14); return Math.max(72, Math.ceil(measureCtx.measureText(ticketText()).width) + 16); }   // EquipmentView: Max(72, 글자 폭 + 16)
+  function finish(buf, zoom, label, texts) {
+    var cv = buf.toCanvas(1);
+    if (texts) { var ctx = cv.getContext('2d'); texts.forEach(function (t) {
+      ctx.fillStyle = shownCss(t.c); ctx.textAlign = t.align || 'left'; ctx.textBaseline = t.base || 'top';
+      ctx.font = fontOf(t.size, t.bold, t.ui);
+      ctx.fillText(t.v, t.x, t.y);
+    }); }
+    if (zoom && zoom.z) {
+      var z = zoom.z, c = document.createElement('canvas'); c.width = zoom.w * z; c.height = zoom.h * z; c.className = 'px';
+      c.style.width = c.width + 'px'; c.style.height = c.height + 'px';
+      var x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(cv, zoom.x, zoom.y, zoom.w, zoom.h, 0, 0, c.width, c.height); cv = c;
+    }
+    cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', label);
+    return cv;
+  }
+  function kindName(k) { return k === 'cur' ? '현행' : '레시피'; }
+  // 알약 안 글자(게임 정렬 그대로): 가운데 정렬 = 보물티켓 · NEW BEST · NEW / 왼쪽 위 = FEVER · 아키 토큰(12,7) / 토스트(12,4 왼쪽)
+  function labelOf(id, x, y, w, h) {
+    var mid = { x: x + w / 2, y: y + h / 2 + 1, align: 'center', base: 'middle' };
+    function at(o, extra) { Object.keys(extra).forEach(function (k) { o[k] = extra[k]; }); return o; }
+    if (id === 'ticket') return at(mid, { v: ticketText(), size: 14, c: tk('MenuGoldTextColor') });
+    if (id === 'best') return at(mid, { v: 'NEW BEST · 최고 128', size: 13, bold: true, c: tk('MenuGoldTextColor') });
+    if (id === 'newb') return at(mid, { v: 'NEW', size: h >= 18 ? 11 : 10, bold: true, c: WHITE });
+    if (id === 'fever') return { v: 'FEVER', x: x, y: y, size: 24, bold: true, c: tk('TextTitleColor') };
+    if (id === 'arch') return { v: '아키텍트 토큰 12    처치 340', x: x + 12, y: y + 9, size: 14, c: tk('TextCaptionColor') };
+    return { v: '노드를 클릭해 자원을 캐세요', x: x + 12, y: y + 8, size: 16, c: tk('TextTitleColor') };
+  }
+  // 런 HUD 왼쪽 위 — RunHudView: 골드 패널 (16,16,344,60 · r14 ElevateCard · 링 1.7) + 아키 토큰 칩 (16,84,344,34)
+  function hudScene(kind, zoom) {
+    var buf = new Buf(376, 134, FIELD_BG);
+    drawCard(buf, 16, 16, 344, 60, 14, tk('RunHudPanelColor'), tk('RunHudGoldPanelBorderColor'), 1.7);
+    drawPill(buf, kind, PILLS.arch, 16, 84);
+    return finish(buf, zoom, kindName(kind) + ' 런 HUD 골드 패널과 아키 토큰 칩', [
+      { v: 'GOLD', x: 28, y: 24, size: 14, c: tk('TextCaptionColor') },
+      { v: '1,240', x: 28, y: 42, size: 24, bold: true, ui: true, c: tk('MenuGoldTextColor') },
+      { v: '총 보유 58,210', x: 210, y: 42, size: 14, c: tk('TextCaptionColor') },
+      labelOf('arch', 16, 84, 344, 34)]);
+  }
+  // 런 화면 위 가운데 — FEVER 배지 (화면 가운데, y 84) · 온보딩 토스트(x 372, y 76 · 폭 913.6 — 왼쪽 420 만 보인다). 둘은 실제로는 같은 띠에 뜬다 — 여기선 위아래로 나눠 놓았다
+  function runScene(kind, zoom) {
+    var buf = new Buf(450, 110, FIELD_BG);
+    drawPill(buf, kind, PILLS.fever, 16, 12);
+    drawPill(buf, kind, PILLS.toast, 16, 64);
+    return finish(buf, zoom, kindName(kind) + ' FEVER 배지와 온보딩 토스트', [labelOf('fever', 16, 12, 200, 38), labelOf('toast', 16, 64, 913.6, 32)]);
+  }
+  // 장비 탭 헤더(EquipmentView.BuildHeader) — 헤더 바 = Panel(Fill(OverlayShellHeaderColor), OverlayShellHeaderOutlineColor, 1.2 · r14) 높이 58 · 배지 y 13 · 오른쪽 끝에서 86 안쪽
+  function eqScene(kind, zoom) {
+    var bw = 470, buf = new Buf(bw, 82, tk('OverlayPanelColor')), hx = -60, hw = bw - 14 - hx, w = ticketWidth(), bx = hx + hw - 86 - w;
+    fillProc(buf, hx, 12, hw, 58, 14, tk('OverlayShellHeaderColor')); elevateProc(buf, hx, 12, hw, 58, 14);
+    ringProc(buf, hx, 12, hw, 58, 14, 1.2, tk('OverlayShellHeaderOutlineColor'));
+    drawPill(buf, kind, PILLS.ticket, bx, 25, { w: w });
+    if (zoom && zoom.auto) zoom = { x: Math.max(0, Math.min(bx - 10, bw - 150)), y: 16, w: Math.min(150, w + 20), h: 50, z: 3 };
+    return finish(buf, zoom, kindName(kind) + ' 장비 헤더 보물티켓 배지 폭 ' + w, [
+      { v: '장비 단계 7', x: 38, y: 32, size: 13, c: tk('MenuCursorColor') }, labelOf('ticket', bx, 25, w, 32)]);
+  }
+  function mount(id, cv) { var hst = document.getElementById(id); hst.innerHTML = ''; hst.appendChild(cv); }
+  function buildScenes() {
+    ['cur', 'rec'].forEach(function (k) {
+      mount('hud-' + k, hudScene(k)); mount('hud-' + k + '-z', hudScene(k, { x: 6, y: 74, w: 180, h: 54, z: 3 }));
+      mount('run-' + k, runScene(k)); mount('run-' + k + '-z', runScene(k, { x: 6, y: 2, w: 224, h: 58, z: 3 }));
+      mount('eq-' + k, eqScene(k)); mount('eq-' + k + '-z', eqScene(k, { auto: true }));
+    });
+  }
+
+  // ── 표: 알약 하나씩 — 자기 면 색 위에
+  function surfaceOf(def) { return def.surface === 'field' ? FIELD_BG : tk(def.surface, 1); }
+  function onePill(kind, id, o, z, noText) {
+    var def = PILLS[id], m = 10, w = (o && o.w) || def.w, h = (o && o.h) || def.h, shown = Math.min(w, (o && o.crop) || w);
+    var buf = new Buf(Math.ceil(shown) + 2 * m, Math.ceil(h) + 2 * m, surfaceOf(def));
+    drawPill(buf, kind, def, m, m, o);
+    var zoom = z ? { x: 0, y: 0, w: Math.min(buf.w, z.w || buf.w), h: buf.h, z: z.z } : null;
+    return finish(buf, zoom, kindName(kind) + ' ' + def.name, noText ? null : [labelOf(id, m, m, w, h)]);
+  }
+  function hx(n, a) { var c = THEME[n], al = a != null ? a : c[3]; return n.replace(/Color$/, '') + ' ' + hexOf(c) + (al < 1 ? ' α' + (+al.toFixed(2)) : ''); }
+  var ROWS = [
+    { id: 'arch', o: { crop: 240 } },
+    { id: 'arch', o: { w: 368.08, h: 36.38, crop: 240 }, note: '획득 펄스 ×1.07 (368×36.4 · 반경은 17 그대로)' },
+    { id: 'toast', o: { crop: 240 } },
+    { id: 'fever', o: {} },
+    { id: 'fever', o: { s: 0.5 }, note: '피버 세기 50% (면·링 알파가 반으로)' },
+    { id: 'ticket', o: {}, live: true },
+    { id: 'best', o: {} },
+    { id: 'newb', o: {}, note: '등급 일반' },
+    { id: 'newb', o: { face: 'GemGradeRareColor' }, note: '등급 희귀' },
+    { id: 'newb', o: { face: 'GemGradeEpicColor' }, note: '등급 영웅' },
+    { id: 'newb', o: { face: 'GemGradeLegendaryColor' }, note: '등급 전설' },
+    { id: 'newb', o: { face: 'GemGradeLegendaryColor', w: 32, h: 18 }, note: '뽑기 서랍 ×1.15 = 32×18 r9' }
+  ];
+  function buildMatrix() {
+    var tb = document.getElementById('matrix'); tb.innerHTML = '';
+    ROWS.forEach(function (row) {
+      var def = PILLS[row.id], o = {}; Object.keys(row.o).forEach(function (k) { o[k] = row.o[k]; });
+      if (row.live) o.w = ticketWidth();
+      var tr = document.createElement('tr'), td = document.createElement('td'); td.className = 'state';
+      td.innerHTML = def.name + '<small>' + (row.note || def.sub) + '</small>'; tr.appendChild(td);
+      ['cur', 'rec'].forEach(function (k) {
+        var c = document.createElement('td'); c.style.display = 'table-cell';
+        var a = onePill(k, row.id, o), z = onePill(k, row.id, o, { z: 3, w: 74 }); a.style.marginBottom = '6px';
+        c.appendChild(a); c.appendChild(z); tr.appendChild(c);
+      });
+      var t2 = document.createElement('td'); t2.className = 'tok';
+      var ft = o.face || def.face, s = o.s == null ? 1 : o.s;
+      t2.textContent = (ft ? '면 ' + hx(ft, def.faceA != null ? def.faceA * (def.pulse ? s : 1) : null) : '면 없음') + ' · ' +
+        (def.ring ? '링 ' + hx(def.ring, def.ringA != null ? def.ringA * (def.pulse ? s : 1) : null) + ' 두께 ' + def.ringT : '링 없음') +
+        (def.elevate ? ' · 현행은 Elevate(SurfaceRaisedTop 램프 + TextBtn α.24 줄)' : '');
+      tr.appendChild(t2); tb.appendChild(tr);
+    });
+  }
+  function buildWidths() {
+    var tb = document.getElementById('widths'); tb.innerHTML = '';
+    [32, 40, 72, 150].forEach(function (w) {
+      var tr = document.createElement('tr'), td = document.createElement('td'); td.className = 'tok'; td.textContent = w + ' × 32' + (w === 32 ? ' (원)' : w === 72 ? ' (최소 폭)' : ''); tr.appendChild(td);
+      ['cur', 'rec'].forEach(function (k) { var c = document.createElement('td'); c.appendChild(onePill(k, 'ticket', { w: w }, { z: 3 }, true)); tr.appendChild(c); });
+      tb.appendChild(tr);
+    });
+  }
+  // ── 반경 벌 공유 비교: 정확한 반경 ↔ 공유 반경(레시피 · 4배 · 왼쪽 끝)
+  function fig(cv, cap) { var f = document.createElement('figure'), c = document.createElement('figcaption'); c.textContent = cap; cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', cap); f.appendChild(cv); f.appendChild(c); return f; }
+  function shareShot(id, o, radius, z) {
+    var def = PILLS[id], m = 10, w = o.w || def.w, h = o.h || def.h, buf = new Buf(70, Math.ceil(h) + 2 * m, surfaceOf(def));
+    var keep = OPT.share, keepR = P.recipeRadius; OPT.share = true; P.recipeRadius = function () { return radius; };
+    try { drawPill(buf, 'rec', def, m, m, o); } finally { OPT.share = keep; P.recipeRadius = keepR; }
+    return finish(buf, { x: 0, y: 0, w: Math.min(70, Math.ceil(w) + 2 * m), h: buf.h, z: z }, '');
+  }
+  function buildShare() {
+    var host = document.getElementById('share'); host.innerHTML = '';
+    host.appendChild(fig(shareShot('arch', {}, 17, 4), '아키 토큰 칩 높이 34 · 정확한 반경 17'));
+    host.appendChild(fig(shareShot('arch', {}, 16, 4), '같은 칩 · 반경 16 벌 공유(제안)'));
+    host.appendChild(fig(shareShot('newb', { w: 32, h: 18, face: 'GemGradeLegendaryColor' }, 9, 4), 'NEW 높이 18 · 정확한 반경 9'));
+    host.appendChild(fig(shareShot('newb', { w: 32, h: 18, face: 'GemGradeLegendaryColor' }, 8, 4), '같은 뱃지 · 반경 8 벌 공유(제안)'));
+    host.appendChild(fig(shareShot('fever', {}, 19, 4), 'FEVER 높이 38 · 정확한 반경 19(제안)'));
+    host.appendChild(fig(shareShot('fever', {}, 16, 4), '같은 배지 · 반경 16 을 주면(안 함 — 끝이 반원이 아님)'));
+  }
+
+  // ── 굽는 텍스처 시트(원본 바이트 그대로 · 3배)
+  function rawCanvas(tex, Z, lines) {
+    var c = document.createElement('canvas'); c.width = tex.W; c.height = tex.H;
+    var x = c.getContext('2d'), img = x.createImageData(tex.W, tex.H), r = tex.raw;
+    for (var y = 0; y < tex.H; y++) for (var xx = 0; xx < tex.W; xx++) { var si = (y * r.stride + r.sx + xx) * 4, di = (y * tex.W + xx) * 4; for (var k = 0; k < 4; k++) img.data[di + k] = r.data[si + k]; }
+    x.putImageData(img, 0, 0);
+    var o = document.createElement('canvas'); o.width = tex.W * Z; o.height = tex.H * Z; o.className = 'px'; o.style.width = o.width + 'px'; o.style.height = o.height + 'px';
+    var ox = o.getContext('2d'); ox.imageSmoothingEnabled = false; ox.drawImage(c, 0, 0, o.width, o.height);
+    ox.strokeStyle = 'rgba(87,209,184,0.55)'; ox.setLineDash([4, 4]);
+    (lines.v || []).forEach(function (v) { ox.beginPath(); ox.moveTo(v * Z + 0.5, 0); ox.lineTo(v * Z + 0.5, o.height); ox.stroke(); });
+    (lines.h || []).forEach(function (v) { ox.beginPath(); ox.moveTo(0, v * Z + 0.5); ox.lineTo(o.width, v * Z + 0.5); ox.stroke(); });
+    return o;
+  }
+  function buildSheet() {
+    var host = document.getElementById('sheet'); host.innerHTML = '';
+    P.RADII.forEach(function (r) {
+      var R = recLayers(r);
+      P.LAYERS.forEach(function (n) {   // 출하 시트의 7칸만 보여 준다(glow 는 게임이 굽지 않는다)
+        var tex = R.layer[n];
+        host.appendChild(fig(rawCanvas(tex, r >= 16 ? 2 : 3, { v: [R.b, tex.W - R.b], h: [R.b, tex.H - R.b] }), 'pill_r' + r + ' · ' + n + ' · ' + tex.W + '×' + tex.H));
+      });
+    });
+  }
+
+  function build() { buildScenes(); buildMatrix(); buildWidths(); buildShare(); buildSheet(); }
+  function live() { ['cur', 'rec'].forEach(function (k) { mount('eq-' + k, eqScene(k)); mount('eq-' + k + '-z', eqScene(k, { auto: true })); }); buildMatrix(); }
+
+  var nIn = document.getElementById('n'), nOut = document.getElementById('n-out');
+  function showN() { nOut.textContent = TICKETS[NIDX] + '장 · 폭 ' + ticketWidth(); }
+  nIn.addEventListener('input', function () { NIDX = parseInt(nIn.value, 10); showN(); live(); });
+  var kIn = document.getElementById('k'), kOut = document.getElementById('k-out');
+  kIn.addEventListener('input', function () { K = parseFloat(kIn.value); kOut.textContent = '×' + K; build(); });
+  var OPTS = ['bevel', 'gloss', 'shadow', 'glow', 'share'];
+  OPTS.forEach(function (k) { document.getElementById('opt-' + k).addEventListener('change', function (e) { OPT[k] = e.target.checked; build(); }); });
+  // ?n=5&k=1.5&bevel=0 … — 헤드리스 렌더 검증용
+  var q = new URLSearchParams(location.search);
+  if (q.has('k')) { K = parseFloat(q.get('k')); kIn.value = K; kOut.textContent = '×' + K; }
+  if (q.has('n')) { NIDX = parseInt(q.get('n'), 10); nIn.value = NIDX; }
+  if (q.get('quant') === '0') QUANT = false;
+  OPTS.forEach(function (k) { if (q.has(k)) { OPT[k] = q.get(k) === '1'; document.getElementById('opt-' + k).checked = OPT[k]; } });
+  showN();
+
+  // ?probe=1 — 엔진 대조용: 엔진 캡처와 같은 장면(1540×110 · 바탕 RunHudPanelColor · 알약 6종 12개 · 글자 없음)의 원시 RGBA(base64)
+  function probe() {
+    var W = 1540, H = 110, out = { W: W, H: H, K: K, opt: OPT, theme: THEME, pills: PILLS };
+    ['cur', 'rec'].forEach(function (kind) {
+      var buf = new Buf(W, H, tk('RunHudPanelColor'));
+      drawPill(buf, kind, PILLS.ticket, 10, 10); drawPill(buf, kind, PILLS.ticket, 100, 10, { w: 150 });
+      drawPill(buf, kind, PILLS.best, 270, 14);
+      drawPill(buf, kind, PILLS.fever, 490, 6); drawPill(buf, kind, PILLS.fever, 490, 60, { s: 0.5 });
+      drawPill(buf, kind, PILLS.toast, 710, 10, { w: 300 }); drawPill(buf, kind, PILLS.toast, 10, 62, { w: 413.6 });
+      drawPill(buf, kind, PILLS.arch, 1030, 8); drawPill(buf, kind, PILLS.arch, 1017.96, 60.81, { w: 368.08, h: 36.38 });
+      drawPill(buf, kind, PILLS.newb, 1400, 16); drawPill(buf, kind, PILLS.newb, 1450, 14, { w: 32, h: 18, face: 'GemGradeLegendaryColor' });
+      drawPill(buf, kind, PILLS.newb, 1400, 70, { face: 'GemGradeEpicColor' });
+      var d = new Uint8Array(W * H * 4), bin = '';
+      for (var p = 0; p < W * H; p++) { d[p * 4] = toSrgb8(buf.r[p]); d[p * 4 + 1] = toSrgb8(buf.g[p]); d[p * 4 + 2] = toSrgb8(buf.b[p]); d[p * 4 + 3] = 255; }
+      for (var j = 0; j < d.length; j += 8192) bin += String.fromCharCode.apply(null, d.subarray(j, j + 8192));
+      out[kind] = btoa(bin);
+    });
+    var pre = document.createElement('pre'); pre.id = 'probe'; pre.style.display = 'none'; pre.textContent = JSON.stringify(out); document.body.appendChild(pre);
+  }
+  build();
+  if (q.get('probe') === '1') probe();
+})();
+</script>

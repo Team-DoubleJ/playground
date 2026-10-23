@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="../">
+<title>deckrift 화면 5종 목업</title>
+<!--
+  deckrift-screens-p51.html
+  용도  : deckrift P51 화면 5종(지도 · 메인 메뉴 · 시작 첫 방 · 쉼터 · 캐릭터 선택)의 구도 목업. 설계 = deckrift/docs/plan-screens-p51.md.
+          owner 판정 2026-10-23: 지도 B · 메뉴 A · 시작 B · 쉼터 B · 캐릭터 A. 게임 코드 없음.
+  원칙  : 배경과 캐릭터는 따로 뽑는다(owner). 배경 = 초안 그림을 임시로 깐다(로컬 파일, 없으면 그라데이션).
+          캐릭터 = 점선 자리(투명 PNG 가 들어갈 곳). 코드로 그림을 흉내 내지 않는다(deckrift CLAUDE.md §5-5).
+  상태  : URL 해시 #map · #menu · #start · #start-1 · #start-2 · #start-3(선택지 호버 고정) · #rest-2 · #rest-4 · #rest-6 · #select
+          ?shot 을 붙이면 전환 탭을 숨긴다(캡처용). ?nobg 면 임시 배경을 끈다. ?art 면 채색 배경 + 투명 캐릭터(screens/render)로 구도 확인.
+  수치  : 체력 70 · 휴식 30% · 균열 이름은 게임(RiftCatalog) 그대로. 유물이 여는 쉼터 선택지는 가칭.
+-->
+<style>
+@font-face{font-family:'Pretendard';src:url('Assets/Resources/Fonts/Pretendard-Regular.otf') format('opentype')}
+:root{
+  --bg:#0e1118; --panel:#1d212d; --line:#2b3244;
+  --atk:#ff4d5e; --skill:#3dd6ff; --sig:#d65cff; --energy:#2ee59d; --gold:#ffd166;
+  --text:#e2e8f0; --muted:#8c99ad;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#05070a;color:var(--text);font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;overflow:hidden}
+#fit{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:linear-gradient(#0b0e14,#11151e 60%,#0b0e14)}
+.abs{position:absolute}
+.screen{position:absolute;inset:0;display:none}
+.screen.on{display:block}
+
+/* 임시 배경: 초안 그림 + 어둡게(UI 가 읽히는지 같이 본다) */
+.bg{position:absolute;inset:0;background-size:cover;background-position:center}
+.bg::after{content:"";position:absolute;inset:0;background:rgba(5,7,12,.45)}
+.bgtag{position:absolute;left:24px;bottom:18px;font-size:16px;color:rgba(255,255,255,.45);letter-spacing:.02em;z-index:40}
+
+/* 캐릭터 자리(투명 PNG) */
+.chr{position:absolute;border:3px dashed rgba(255,209,102,.85);border-radius:10px;background:rgba(255,209,102,.07);
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:14px;gap:4px;color:var(--gold);text-align:center;z-index:5}
+.chr b{font-size:22px}
+.chr span{font-size:15px;color:rgba(255,236,190,.75);line-height:1.35}
+.chr::after{content:"";position:absolute;left:50%;bottom:-8px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 4px rgba(255,209,102,.25)}
+.chr.mini{padding-bottom:4px}
+.chr.mini b{font-size:13px}
+
+body.art .chr{border:0;background:none;padding:0}
+body.art .chr>b,body.art .chr>span,body.art .chr::after,body.art .bgtag,body.art .termtag,body.art .restnote{display:none}
+body.art .chr img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;object-position:50% 100%}
+body.art .plat{display:none}
+body.art .noart{display:none}
+body.art .bg::after{background:rgba(5,7,12,.15)}
+body.art #mon{left:300px;top:62px;width:1325px;height:800px;background:none;border:0;box-shadow:none;border-radius:40px}
+body.art #mon::before{display:none}
+body.art #mon .path{left:60px;top:40px}
+body.art #mon .boss{left:480px;top:60px}
+body.art #mon .scroll{right:40px;top:110px}
+body.art #mon .scrolltag{right:60px;top:106px}
+body.art .legend{left:1380px;top:560px;width:220px;padding:14px 18px;font-size:16px;line-height:1.8}
+body.art .dock{top:930px}
+body.art .chr.mini{left:470px!important;top:478px!important;width:100px!important;height:100px!important}
+body.art #s-menu .logo{left:620px;top:170px}
+body.art #s-menu .chr{left:440px!important;top:470px!important;width:430px!important;height:430px!important}
+body.art #s-menu .logo{left:520px;top:40px;width:560px;height:200px}
+body.art #term{left:155px;top:112px;width:983px;height:670px;border-radius:6px;border:0}
+body.art .bootq{left:1260px;width:620px}
+body.art .picks{left:1260px;width:620px}
+body.art #s-rest .chr{left:120px!important;top:560px!important;width:430px!important;height:430px!important}
+body.art .roster{top:892px}
+body.art .selname{display:none}
+body.art #s-menu .logo{border:0;background:none}
+body.art #s-menu .logo span{display:none}
+body.art #s-menu .logo b{font:900 96px 'Pretendard';letter-spacing:.14em;color:#c9f4ff;text-shadow:0 0 6px #3dd6ff,0 0 26px #3dd6ff,0 0 60px rgba(61,214,255,.6),-3px 0 rgba(255,42,109,.55),3px 0 rgba(61,214,255,.55)}
+body.art #s-menu .logo::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(5,7,12,.35) 0 2px,transparent 2px 5px);pointer-events:none}
+body.art.logoimg #s-menu .logo{left:400px;top:10px;width:840px;height:330px}
+body.art.logoimg #s-menu .logo::after{display:none}
+body.art.logoimg #s-menu .logo img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 24px rgba(61,214,255,.35))}
+body.art.logo-b #s-menu .logo{left:1280px;top:70px;width:520px;height:120px}
+body.art.logo-b #s-menu .logo b{font-size:72px}
+body.art.logo-c #s-menu .logo{left:540px;top:500px;width:340px;height:180px;transform:perspective(900px) rotateY(-16deg) rotateZ(-2deg)}
+body.art.logo-c #s-menu .logo b{font-size:52px;color:#eafcff}
+/* 흑연 판 */
+.plate{background:linear-gradient(160deg,rgba(28,33,48,.94),rgba(20,24,34,.94) 70%);border:2px solid #303a50;
+  clip-path:polygon(18px 0,calc(100% - 18px) 0,100% 18px,100% calc(100% - 18px),calc(100% - 18px) 100%,18px 100%,0 calc(100% - 18px),0 18px)}
+
+/* 상단 바(게임 현행 모양 요약) */
+.top{left:0;top:0;width:100%;height:76px;display:flex;align-items:center;gap:36px;padding:0 40px;
+  background:linear-gradient(rgba(26,31,43,.96),rgba(18,22,31,.96));border-bottom:2px solid var(--line);z-index:30;font-size:28px;font-weight:700}
+.top .sp{flex:1}
+.top small{font-size:19px;color:var(--muted);font-weight:500}
+.top .tb{height:44px;padding:0 22px;border:2px solid var(--line);border-radius:10px;display:grid;place-items:center;font-size:22px;color:#c9d3e2}
+
+/* 전환 탭 */
+#tabs{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:6px;z-index:99;background:rgba(10,12,18,.9);padding:6px;border-radius:10px;border:1px solid #2b3244}
+#tabs a{color:#c9d3e2;text-decoration:none;font-size:14px;padding:6px 10px;border-radius:6px}
+#tabs a.on{background:#3dd6ff;color:#06131a;font-weight:700}
+body.shot #tabs{display:none}
+
+/* ── 지도 B: 모니터 안 폴더 트리 ── */
+#mon{left:330px;top:120px;width:1260px;height:740px;border-radius:26px;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 40%,rgba(14,36,48,.92),rgba(6,12,18,.96));border:3px solid rgba(61,214,255,.35);box-shadow:inset 0 0 80px rgba(61,214,255,.12)}
+#mon::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 2px,transparent 2px 4px);pointer-events:none;z-index:3}
+#mon .path{position:absolute;left:24px;top:18px;font:600 20px Consolas,monospace;color:rgba(61,214,255,.85)}
+#mon .scroll{position:absolute;right:16px;top:70px;width:8px;height:600px;border-radius:4px;background:rgba(255,255,255,.08)}
+#mon .scroll i{position:absolute;left:0;bottom:0;width:8px;height:190px;border-radius:4px;background:rgba(61,214,255,.6)}
+#mon .scrolltag{position:absolute;right:34px;top:66px;font-size:15px;color:var(--muted);text-align:right;line-height:1.4}
+.fnode{position:absolute;width:150px;height:72px;margin:-36px 0 0 -75px;border-radius:10px;border:2px solid;display:flex;align-items:center;gap:8px;padding:0 10px;
+  background:rgba(10,14,22,.92);font-size:18px;font-weight:700;z-index:2}
+.fnode .ic{width:40px;height:40px;border-radius:8px;display:grid;place-items:center;font-size:20px;font-weight:900;color:#0b0e14;flex:none}
+.fnode small{display:block;font:500 13px Consolas,monospace;color:var(--muted)}
+.fnode.done{opacity:.5}
+.fnode.cur{box-shadow:0 0 0 4px rgba(61,214,255,.35),0 0 30px rgba(61,214,255,.4)}
+.fnode.next{animation:pulse 1.2s ease-in-out infinite alternate}
+@keyframes pulse{to{box-shadow:0 0 22px currentColor}}
+.nd{position:absolute;width:96px;height:96px;margin:-48px 0 0 -48px;display:grid;place-items:center;z-index:2}
+.nd img,.nd i{width:84px;height:84px;display:block;-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center}
+.nd.elite img{width:100px;height:100px;filter:hue-rotate(290deg) saturate(1.4) drop-shadow(0 0 10px rgba(214,92,255,.6))}
+.nd.done{opacity:.35;filter:grayscale(.5)}
+.nd.cur::before{content:"";position:absolute;inset:-6px;border-radius:50%;background:radial-gradient(circle,rgba(61,214,255,.45),transparent 70%)}
+.nd.next{animation:bob 1s ease-in-out infinite alternate}
+@keyframes bob{to{transform:scale(1.12)}}
+.boss{left:450px;top:40px;width:360px;height:110px;border:2px solid var(--gold);border-radius:12px;background:rgba(40,28,6,.85);padding:12px 16px;font:600 16px Consolas,monospace;color:#ffe3a0;z-index:2}
+.boss b{font:800 24px 'Pretendard';color:var(--gold);display:block;margin-bottom:4px}
+.dock{left:540px;top:900px;width:840px;height:110px;display:flex;gap:14px;align-items:center;justify-content:center;padding:0 20px;z-index:6}
+.dock .d{width:150px;height:80px;border:2px solid var(--line);border-radius:10px;background:rgba(18,22,31,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:20px;font-weight:700}
+.dock .d small{font-size:14px;color:var(--muted);font-weight:500}
+.legend{left:1620px;top:200px;width:260px;padding:20px;z-index:6;font-size:18px;line-height:2}
+.legend i{display:inline-block;width:16px;height:16px;border-radius:4px;margin-right:10px;vertical-align:-2px}
+
+/* ── 메뉴 A ── */
+.logo{left:240px;top:120px;width:560px;height:220px;border:3px dashed rgba(61,214,255,.6);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:var(--skill);background:rgba(61,214,255,.05);z-index:5}
+.logo b{font-size:64px;letter-spacing:.12em}
+.logo span{font-size:16px;color:var(--muted)}
+.menu{left:1280px;top:200px;width:520px;padding:28px;z-index:6;display:flex;flex-direction:column;gap:14px}
+.mi{height:76px;border:2px solid #34405a;border-radius:10px;display:flex;align-items:center;gap:18px;padding:0 22px;font-size:28px;font-weight:700;background:rgba(14,18,26,.85)}
+.mi small{font-size:17px;color:var(--muted);font-weight:500;margin-left:auto}
+.mi .gl{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;font-size:20px;color:#081018}
+.mi.hot{border-color:var(--skill);box-shadow:0 0 0 3px rgba(61,214,255,.2),0 0 26px rgba(61,214,255,.25)}
+.mi.dim{opacity:.55}
+.profile{left:1280px;top:820px;width:520px;height:140px;padding:20px 26px;z-index:6;display:flex;gap:18px;align-items:center}
+.profile .ph{width:96px;height:96px;border:2px dashed rgba(255,209,102,.7);border-radius:10px;display:grid;place-items:center;font-size:13px;color:var(--gold);text-align:center}
+.profile .tx{font-size:18px;line-height:1.6;color:#cfd8e6}
+.profile .tx b{font-size:22px;color:var(--text)}
+
+/* ── 시작 B: 부팅 단말 + 오른쪽 선택지 ── */
+#term{left:662px;top:219px;width:438px;height:400px;border-radius:14px;overflow:hidden;z-index:4;
+  --c:#ffb347;background:radial-gradient(ellipse at 50% 50%,color-mix(in srgb,var(--c) 30%,#05070a),#05070a 85%);
+  border:3px solid color-mix(in srgb,var(--c) 70%,transparent);box-shadow:0 0 60px color-mix(in srgb,var(--c) 45%,transparent),inset 0 0 50px color-mix(in srgb,var(--c) 35%,transparent);
+  transition:--c .2s}
+#term::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.35) 0 2px,transparent 2px 4px);z-index:2}
+#term .glyph{position:absolute;inset:0;display:grid;place-items:center;font-size:120px;font-weight:900;color:var(--c);text-shadow:0 0 30px var(--c)}
+#term .ln{position:absolute;left:22px;top:16px;font:600 18px Consolas,monospace;color:var(--c);z-index:3;line-height:1.5}
+#term .slices{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0}
+#term.glitch .slices{animation:slice .6s steps(1) 1}
+#term.glitch .glyph{animation:jit .6s steps(1) 1,rgb .6s steps(1) 1}
+#term.glitch{animation:tear .6s steps(1) 1}
+#term .slices i{position:absolute;left:0;width:100%;background:var(--c);mix-blend-mode:screen;opacity:.7}
+#term .noise{position:absolute;inset:-20%;z-index:4;pointer-events:none;opacity:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");mix-blend-mode:screen}
+#term.glitch .noise{animation:noise .6s steps(6) 1}
+#term .flash{position:absolute;inset:0;z-index:5;background:var(--c);opacity:0;pointer-events:none}
+#term.glitch .flash{animation:flash .6s ease-out 1}
+.screen.shake{animation:shake .32s steps(2) 1}
+@keyframes tear{0%{clip-path:inset(0 0 0 0);filter:contrast(2) brightness(1.6)}15%{clip-path:inset(12% 0 30% 0);transform:translateX(16px)}30%{clip-path:inset(0 0 0 0);transform:translateX(-12px) skewX(-4deg)}45%{clip-path:inset(40% 0 8% 0);transform:translateX(8px)}60%{clip-path:inset(0);filter:contrast(1.4)}100%{transform:none;filter:none}}
+@keyframes rgb{0%{text-shadow:-14px 0 #ff2a6d,14px 0 #3dd6ff,0 0 30px var(--c)}40%{text-shadow:9px 2px #ff2a6d,-9px -2px #3dd6ff}80%{text-shadow:-3px 0 #ff2a6d,3px 0 #3dd6ff}100%{text-shadow:0 0 30px var(--c)}}
+@keyframes noise{0%{opacity:.75;transform:translate(0,0)}20%{transform:translate(-8%,4%)}40%{transform:translate(5%,-6%)}60%{opacity:.5;transform:translate(-3%,7%)}80%{opacity:.25;transform:translate(6%,2%)}100%{opacity:0;transform:none}}
+@keyframes flash{0%{opacity:.85}12%{opacity:0}22%{opacity:.4}35%,100%{opacity:0}}
+@keyframes shake{0%{transform:translate(6px,-3px)}50%{transform:translate(-5px,4px)}100%{transform:none}}
+@keyframes slice{0%{opacity:1;transform:translateX(-14px)}25%{transform:translateX(18px)}50%{transform:translateX(-6px)}75%{transform:translateX(10px)}100%{opacity:0;transform:none}}
+@keyframes jit{0%{transform:translate(8px,-4px) skewX(8deg);filter:hue-rotate(60deg)}30%{transform:translate(-10px,3px)}60%{transform:translate(4px,0) skewX(-6deg)}100%{transform:none;filter:none}}
+.termtag{left:662px;top:630px;width:438px;text-align:center;font-size:15px;color:var(--muted);z-index:5}
+.bootq{left:1150px;top:150px;width:720px;font-size:24px;color:#cfd8e6;z-index:6;line-height:1.5}
+.bootq b{display:block;font-size:34px;color:var(--text)}
+.picks{left:1150px;top:290px;width:720px;display:flex;flex-direction:column;gap:22px;z-index:6}
+.pick{--c:#3dd6ff;position:relative;height:170px;display:flex;align-items:center;gap:22px;padding:0 30px;cursor:pointer;
+  border:3px solid color-mix(in srgb,var(--c) 45%,#2b3244);border-radius:14px;background:rgba(12,16,24,.9);transition:transform .12s,box-shadow .12s}
+.pick .gl{width:96px;height:96px;flex:none;border-radius:14px;display:grid;place-items:center;font-size:44px;font-weight:900;color:#081018;background:var(--c)}
+.pick b{font-size:32px;color:var(--c)}
+.pick p{font-size:22px;line-height:1.45;color:#d4dcea;margin-top:6px}
+.pick .gain{color:var(--energy)} .pick .cost{color:var(--atk)}
+.pick.on{border-color:var(--c);transform:translateX(-12px);box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 30%,transparent),0 0 40px color-mix(in srgb,var(--c) 40%,transparent)}
+.pick .arrow{position:absolute;left:-46px;top:50%;margin-top:-18px;font-size:30px;color:var(--c);opacity:0}
+.pick.on .arrow{opacity:1}
+
+/* ── 쉼터 B: 선택지 N 개 세로 목록 ── */
+.restq{left:640px;top:90px;width:1200px;font-size:22px;color:var(--muted);z-index:6}
+.restq b{display:block;font-size:40px;color:var(--text);margin-bottom:4px}
+.opts{left:640px;top:200px;width:1200px;height:800px;display:flex;flex-direction:column;justify-content:center;gap:var(--gap,20px);z-index:6}
+.opt{--c:#2ee59d;height:var(--h,170px);display:flex;align-items:center;gap:24px;padding:0 28px;border:3px solid color-mix(in srgb,var(--c) 55%,#2b3244);border-radius:14px;background:rgba(12,16,24,.9)}
+.opt .gl{width:calc(var(--h,170px) - 60px);height:calc(var(--h,170px) - 60px);max-width:130px;max-height:130px;flex:none;border-radius:14px;display:grid;place-items:center;font-size:40px;font-weight:900;color:#081018;background:var(--c)}
+.opt .t{flex:1}
+.opt b{font-size:var(--fs,34px);color:var(--text)}
+.opt p{font-size:var(--ps,22px);color:#c5cfdf;margin-top:4px}
+.opt .num{font-size:30px;font-weight:800;color:var(--c);white-space:nowrap}
+.opt .src{display:inline-block;margin-left:10px;font-size:15px;padding:2px 10px;border-radius:999px;border:1px solid rgba(255,209,102,.6);color:var(--gold);vertical-align:4px;font-weight:600}
+.opt.lock{opacity:.5;border-style:dashed}
+.opt.lock .gl{background:#3a4357;color:#9aa6ba}
+.opt.lock .num{color:var(--atk);font-size:18px}
+.opt.hot{box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 30%,transparent),0 0 30px color-mix(in srgb,var(--c) 35%,transparent)}
+.restnote{left:640px;top:1020px;width:1200px;font-size:15px;color:var(--muted);z-index:6}
+
+/* ── 캐릭터 선택 A ── */
+.info{left:40px;top:110px;width:500px;height:800px;padding:30px;z-index:6;display:flex;flex-direction:column;gap:18px}
+.info h2{font-size:44px}
+.info .role{font-size:18px;color:var(--muted);margin-top:-12px}
+.info .row{font-size:22px;display:flex;gap:16px;align-items:center}
+.info .row b{color:var(--atk)}
+.relic{display:flex;gap:16px;align-items:center;border:2px solid #34405a;border-radius:10px;padding:14px}
+.relic .ri{width:64px;height:64px;border:2px dashed rgba(214,92,255,.6);border-radius:10px;display:grid;place-items:center;font-size:12px;color:var(--sig);text-align:center;flex:none}
+.relic b{font-size:22px} .relic p{font-size:17px;color:#c5cfdf;margin-top:4px;line-height:1.4}
+.deckseg{display:flex;gap:6px}
+.deckseg span{flex:1;height:46px;border:2px solid #34405a;border-radius:8px;display:grid;place-items:center;font-size:18px;color:var(--muted)}
+.deckseg span.on{border-color:var(--skill);color:var(--text);background:rgba(61,214,255,.1)}
+.deckseg span.lk{border-style:dashed;opacity:.6}
+.minis{display:flex;flex-wrap:wrap;gap:8px}
+.minis i{width:66px;height:90px;border-radius:6px;border:2px solid;font-style:normal;font-size:13px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;background:rgba(14,18,26,.9)}
+.info .lbl{font-size:16px;color:var(--muted);letter-spacing:.04em}
+.plat{left:1010px;top:790px;width:560px;height:90px;border-radius:50%;border:3px solid rgba(61,214,255,.6);box-shadow:0 0 50px rgba(61,214,255,.35);z-index:3}
+.roster{left:600px;top:880px;display:flex;gap:22px;z-index:6}
+.roster i{position:relative;width:180px;height:180px;border:3px solid #34405a;border-radius:16px;background:rgba(14,18,26,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;font-style:normal;font-size:18px;color:var(--muted);cursor:pointer;transition:transform .12s}
+.roster i .th{width:128px;height:128px;object-fit:contain}
+.roster i em{font-style:normal;font-weight:700;margin-top:2px}
+.roster i.lk .th{filter:brightness(0) drop-shadow(0 0 1px #4a5570);opacity:.8}
+.roster i.on{border-color:var(--gold);color:var(--gold);transform:translateY(-10px);box-shadow:0 0 0 4px rgba(255,209,102,.25),0 0 34px rgba(255,209,102,.45)}
+#s-select.selin .bg{animation:selbg .7s cubic-bezier(.2,.8,.2,1)}
+#s-select.selin .info h2,#s-select.selin .selname b{animation:slam .45s cubic-bezier(.2,1.4,.4,1)}
+@keyframes selbg{0%{transform:scale(1.08);filter:brightness(2.2) saturate(1.6)}100%{transform:none;filter:none}}
+@keyframes slam{0%{transform:scale(1.8);opacity:0;letter-spacing:.4em}100%{transform:none;opacity:1}}
+.go{left:1500px;top:950px;width:380px;height:110px;z-index:6;display:flex;flex-direction:column;gap:10px}
+.go .opts2{display:flex;gap:10px;font-size:17px;color:var(--muted)}
+.go .opts2 span{flex:1;height:40px;border:2px solid #34405a;border-radius:8px;display:grid;place-items:center}
+.go .btn{flex:1;border-radius:12px;background:linear-gradient(#3dd6ff,#1aa6cf);color:#04121a;font-size:30px;font-weight:900;display:grid;place-items:center}
+.selname{left:1480px;top:140px;width:400px;text-align:right;z-index:6}
+.selname b{font-size:56px;display:block} .selname span{font-size:20px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="fit"><div id="stage">
+
+<!-- ───────── 지도 B 폴더 트리 ───────── -->
+<section class="screen" id="s-map" data-bg="map_b" data-artbg="bg_map">
+  <div class="bg"></div>
+  <div class="abs top"><span>♥ 54<small>/70</small></span><span>◉ 132</span><span>막 1 · 7층</span><span class="sp"></span><span class="tb">덱 12</span><span class="tb">⚙</span></div>
+  <div class="abs" id="mon">
+    <div class="path">C:\rift\act1\sector_07&gt; _</div>
+    <div class="abs boss"><b>⚠ 보스: 커널 패닉</b>FATAL 0x0000007E · /act1/boss</div>
+    <svg class="abs" style="left:0;top:0;width:1260px;height:740px;z-index:1" viewBox="0 0 1260 740" fill="none" stroke-width="3">
+      <g stroke="rgba(140,153,173,.45)">
+        <path d="M630 150 V200 L380 222"/><path d="M630 200 L880 222"/>
+        <path d="M380 318 L250 372"/><path d="M380 318 L520 372"/><path d="M880 318 L760 372"/><path d="M880 318 L1010 372"/>
+        <path d="M360 532 L250 468"/><path d="M760 532 L760 468"/><path d="M960 532 L1010 468"/>
+      </g>
+      <g stroke="#ffd166" stroke-width="4" stroke-dasharray="8 6"><path d="M520 532 L520 468"/><path d="M520 532 L250 468"/></g>
+      <g stroke="#3dd6ff" stroke-width="4"><path d="M520 628 L520 662"/></g>
+    </svg>
+    <div class="nd elite" style="left:380px;top:270px"><img src="Assets/Resources/Deckrift/Icons/attack.svg"></div>
+    <div class="nd " style="left:880px;top:270px"><img src="Assets/Resources/Deckrift/Icons/node_rest.svg"></div>
+    <div class="nd next" style="left:250px;top:420px"><img src="Assets/Resources/Deckrift/Icons/attack.svg"></div>
+    <div class="nd next" style="left:520px;top:420px"><img src="Assets/Resources/Deckrift/Icons/node_event.svg"></div>
+    <div class="nd " style="left:760px;top:420px"><img src="Assets/Resources/Deckrift/Icons/node_shop.svg"></div>
+    <div class="nd " style="left:1010px;top:420px"><img src="Assets/Resources/Deckrift/Icons/attack.svg"></div>
+    <div class="nd done" style="left:360px;top:580px"><img src="Assets/Resources/Deckrift/Icons/attack.svg"></div>
+    <div class="nd cur" style="left:520px;top:580px"><img src="Assets/Resources/Deckrift/Icons/attack.svg"></div>
+    <div class="nd done" style="left:760px;top:580px"><img src="Assets/Resources/Deckrift/Icons/node_treasure.svg"></div>
+    <div class="nd done" style="left:960px;top:580px"><img src="Assets/Resources/Deckrift/Icons/attack.svg"></div>
+    <div class="nd done" style="left:520px;top:710px"><img src="Assets/Resources/Deckrift/Icons/node_event.svg"></div>
+    <div data-art="chr_map_token" class="chr mini" style="left:493px;top:505px;width:54px;height:70px;z-index:4"><b>말</b></div>
+    <div class="scroll"><i></i></div>
+    <div class="scrolltag">7 / 20층<br>휠 = 위아래</div>
+  </div>
+  <div class="abs plate legend"><b style="font-size:20px">칸 종류</b><br>
+    <i style="background:#ff4d5e"></i>전투<br><i style="background:#d65cff"></i>엘리트<br><i style="background:#ffb347"></i>이벤트<br><i style="background:#4fc3ff"></i>블랙마켓<br><i style="background:#2ee59d"></i>쉼터<br><i style="background:#ffd166"></i>보물 · 보스</div>
+  <div class="abs dock"><div class="d">덱<small>12장</small></div><div class="d">유물<small>3개</small></div><div class="d">패치<small>2/3</small></div><div class="d">균열<small>오버클럭</small></div></div>
+  <div class="bgtag">배경 자리 = 지도 B 초안(모니터 방, 캐릭터 없이 다시 뽑음) · 금색 점선 = 미니어처 말(투명 PNG)</div>
+</section>
+
+<!-- ───────── 메뉴 A 은신처 ───────── -->
+<section class="screen" id="s-menu" data-bg="menu_a" data-artbg="scn_menu">
+  <div class="bg"></div>
+  <div class="abs logo"><b>DECKRIFT</b><span>로고 자리(홀로그램 · 따로 뽑음)</span></div>
+  <div data-art="chr_menu" class="chr noart" style="left:520px;top:430px;width:300px;height:470px"><b>캐릭터 자리</b><span>책상 앞 해커(투명 PNG)<br>고른 캐릭터로 바뀜</span></div>
+  <div class="abs plate menu">
+    <div class="mi hot"><span class="gl" style="background:#3dd6ff">▶</span>이어하기<small>세션 복구 · 막 1 7층</small></div>
+    <div class="mi"><span class="gl" style="background:#ffd166">+</span>새 런<small>캐릭터 선택</small></div>
+    <div class="mi"><span class="gl" style="background:#d65cff">≡</span>도감<small>격리된 오류 DB</small></div>
+    <div class="mi"><span class="gl" style="background:#8c99ad">⚙</span>설정</div>
+    <div class="mi dim"><span class="gl" style="background:#3a4357">✕</span>종료</div>
+  </div>
+  <div class="abs plate profile"><div class="ph">캐릭터<br>얼굴</div><div class="tx"><b>지난 런</b><br>해커 · 막 2 보스에서 종료<br>최고 점수 1,240</div></div>
+  <div class="bgtag">배경 자리 = 메뉴 A 초안(은신처, 캐릭터 없이 다시 뽑음)</div>
+</section>
+
+<!-- ───────── 시작 B 부팅 메뉴 ───────── -->
+<section class="screen" id="s-start" data-bg="start_b" data-artbg="bg_start">
+  <div class="bg"></div>
+  <div data-art="chr_start" class="chr noart" style="left:220px;top:500px;width:310px;height:320px"><b>캐릭터 자리</b><span>단말에 케이블 꽂는 해커<br>(투명 PNG)</span></div>
+  <div class="abs" id="term">
+    <div class="ln">BOOT&gt; rift.select<br><span id="termTxt">대기 중...</span></div>
+    <div class="glyph" id="termGlyph">◇</div>
+    <div class="slices" id="slices"></div><div class="noise"></div><div class="flash"></div>
+  </div>
+  <div class="abs termtag">가운데 모니터 = 런타임이 색을 칠하는 자리(배경 그림의 화면 부분과 겹침)</div>
+  <div class="abs bootq"><b>균열 하나를 연결하라</b>이번 런 내내 붙는다. 얻는 것과 잃는 것을 같이 본다.</div>
+  <div class="abs picks">
+    <div class="pick" data-i="1" style="--c:#2ee59d"><span class="arrow">▶</span><span class="gl">⚡</span><div><b>메모리 누수</b><p><span class="gain">매 턴 에너지 +1</span><br><span class="cost">덱에 버그 3장</span></p></div></div>
+    <div class="pick" data-i="2" style="--c:#ffd166"><span class="arrow">▶</span><span class="gl">⟳</span><div><b>오버클럭</b><p><span class="gain">매 턴 카드 +1장</span><br><span class="cost">최대 체력 -12</span></p></div></div>
+    <div class="pick" data-i="3" style="--c:#d65cff"><span class="arrow">▶</span><span class="gl">#</span><div><b>루트 권한</b><p><span class="gain">전투 첫 턴 에너지 +2</span><br><span class="cost">기본 스킬 해킹 사용 불가</span></p></div></div>
+  </div>
+  <div class="bgtag">배경 자리 = 시작 B 초안(부팅 단말, 캐릭터 없이) · 선택지에 올리면 치지직 + 모니터 색 바뀜</div>
+</section>
+
+<!-- ───────── 쉼터 B 충전 포드 ───────── -->
+<section class="screen" id="s-rest" data-bg="rest_b" data-artbg="bg_rest">
+  <div class="bg"></div>
+  <div data-art="chr_rest" class="chr" style="left:380px;top:470px;width:420px;height:420px"><b>캐릭터 자리</b><span>포드에 기대 쉬는 해커<br>(투명 PNG)</span></div>
+  <div class="abs restq"><b>충전 포드</b>하나만 고를 수 있다.</div>
+  <div class="abs opts" id="opts"></div>
+  <div class="abs restnote" id="restnote"></div>
+  <div class="bgtag">배경 자리 = 쉼터 B 초안(충전 포드, 캐릭터 없이)</div>
+</section>
+
+<!-- ───────── 캐릭터 선택 A ───────── -->
+<section class="screen" id="s-select" data-bg="select_a" data-artbg="scn_select_hacker">
+  <div class="bg"></div>
+  <div class="abs plate info">
+    <h2>해커</h2><div class="role">접속 프로필 #01 · 균열 침투형</div>
+    <div class="row"><span>체력</span><b>70</b><span style="color:var(--gold)">◉ 99</span></div>
+    <div class="lbl">시작 유물</div>
+    <div class="relic"><div class="ri">유물<br>아이콘</div><div><b>구형 키패드</b><p>회수한 구형 장치. 효과 문구 자리(가칭).</p></div></div>
+    <div class="lbl">시작 덱 (나중에 고르기)</div>
+    <div class="deckseg"><span class="on">기본 덱</span><span class="lk">덱 B 🔒</span><span class="lk">덱 C 🔒</span></div>
+    <div class="minis">
+      <i style="border-color:#ff4d5e">타격×5</i><i style="border-color:#3dd6ff">수비×4</i><i style="border-color:#d65cff">해킹</i><i style="border-color:#d65cff">대표</i>
+    </div>
+    <div class="lbl" style="margin-top:auto">덱을 바꾸면 위 카드 줄만 바뀐다(가운데 그림 그대로)</div>
+  </div>
+  <div class="abs plat"></div>
+  <div data-art="chr_select" class="chr noart" style="left:1040px;top:190px;width:500px;height:640px"><b>캐릭터 자리</b><span>선택 화면 전신 해커(투명 PNG)<br>캐릭터마다 한 장</span></div>
+  <div class="abs selname"><b>해커</b><span>클릭 한 번 = 고름, 출발 = 시작</span></div>
+  <div class="abs roster"><i class="on" onclick="selFx()"><img class="th" src="file:///D:/Downloads/deckrift-prompts/screens/render/keyed/chr_map_token.png"><em>해커</em></i><i class="lk"><img class="th" src="file:///D:/Downloads/deckrift-prompts/screens/render/keyed/chr_map_token.png"><em>🔒 잠김</em></i><i class="lk"><img class="th" src="file:///D:/Downloads/deckrift-prompts/screens/render/keyed/chr_map_token.png"><em>🔒 잠김</em></i><i class="lk"><img class="th" src="file:///D:/Downloads/deckrift-prompts/screens/render/keyed/chr_map_token.png"><em>🔒 잠김</em></i></div>
+  <div class="abs go"><div class="opts2"><span>시드</span><span>난이도 0</span></div><div class="btn">출발 ▶</div></div>
+  <div class="bgtag">배경 자리 = 캐릭터 A 초안(무대, 캐릭터 없이)</div>
+</section>
+
+</div></div>
+
+<div id="tabs">
+  <a href="#map">지도 B</a><a href="#menu">메뉴 A</a><a href="#start">시작 B</a><a href="#start-2">시작 호버</a>
+  <a href="#rest-2">쉼터 2개</a><a href="#rest-4">쉼터 4개</a><a href="#rest-6">쉼터 6개</a><a href="#select">캐릭터 A</a>
+</div>
+
+<script>
+const q=new URLSearchParams(location.search);
+if(q.has('shot'))document.body.classList.add('shot');
+if(q.get('logo'))document.body.classList.add('logo-'+q.get('logo'));
+if(q.get('logoimg')){document.body.classList.add('logoimg');const L=document.querySelector('#s-menu .logo');L.innerHTML=`<img src="file:///D:/Downloads/deckrift-prompts/screens/logo/keyed/${q.get('logoimg')}.png">`}
+const BG='file:///D:/Downloads/deckrift-prompts/screens/out/';
+if(!q.has('nobg'))document.querySelectorAll('.screen').forEach(s=>{const id=s.dataset.bg;s.querySelector('.bg').style.backgroundImage=`url('${BG}${id}/${id}.png')`});
+
+const ART='file:///D:/Downloads/deckrift-prompts/screens/render/';
+if(q.has('art')){document.body.classList.add('art');
+  document.querySelectorAll('.screen').forEach(s=>{const id=s.dataset.artbg;if(id)s.querySelector('.bg').style.backgroundImage=`url('${ART}out/${id}/${id}.png')`});
+  document.querySelectorAll('[data-art]').forEach(c=>{const im=document.createElement('img');im.src=`${ART}keyed/${c.dataset.art}.png`;c.appendChild(im)});}
+function fit(){const s=Math.min(innerWidth/1920,innerHeight/1080);document.getElementById('fit').style.transform=`scale(${s})`}
+addEventListener('resize',fit);fit();
+
+/* 시작 B: 호버 = 치지직 + 모니터 색 */
+const term=document.getElementById('term');
+const glyph={1:'⚡',2:'⟳',3:'#'};
+function pick(el){
+  document.querySelectorAll('.pick').forEach(p=>p.classList.toggle('on',p===el));
+  if(!el){term.style.setProperty('--c','#ffb347');termGlyph.textContent='◇';termTxt.textContent='대기 중...';return}
+  term.style.setProperty('--c',getComputedStyle(el).getPropertyValue('--c').trim());
+  termGlyph.textContent=glyph[el.dataset.i];termTxt.textContent='mount '+el.querySelector('b').textContent;
+  slices.innerHTML=Array.from({length:9},()=>`<i style="top:${Math.random()*95}%;height:${1+Math.random()*9}%"></i>`).join('');
+  const sc=document.getElementById('s-start');
+  term.classList.remove('glitch');sc.classList.remove('shake');void term.offsetWidth;term.classList.add('glitch');sc.classList.add('shake');
+}
+document.querySelectorAll('.pick').forEach(p=>{p.addEventListener('mouseenter',()=>pick(p))});
+document.querySelector('.picks').addEventListener('mouseleave',()=>pick(null));
+
+/* 쉼터 B: 선택지 N 개. 3개까지 큰 칸, 4~5 중간, 6 이상 촘촘 */
+const OPTS=[
+  {c:'#2ee59d',g:'♥',t:'휴식',p:'냉각. 최대 체력의 30% 회복',n:'체력 +21'},
+  {c:'#3dd6ff',g:'+',t:'강화',p:'핫픽스. 카드 1장 강화',n:'카드 1장'},
+  {c:'#ff8a4d',g:'✂',t:'분해',p:'카드 1장 제거',n:'카드 -1',src:'유물: 납땜 인두'},
+  {c:'#d65cff',g:'⇄',t:'재컴파일',p:'카드 1장을 같은 종류 무작위로',n:'변환 1',src:'유물: 낡은 컴파일러'},
+  {c:'#ffd166',g:'⌕',t:'덤프 뒤지기',p:'무작위 유물 1개',n:'유물 +1',src:'유물: 메모리 스캐너'},
+  {c:'#8c99ad',g:'🔒',t:'백업 복원',p:'잠긴 선택지 예시',n:'잠김: 이번 막에 이미 씀',lock:1,src:'유물: 외장 드라이브'},
+];
+function selFx(){const s=document.getElementById('s-select');s.classList.remove('selin');void s.offsetWidth;s.classList.add('selin')}
+function rest(n){
+  const box=document.getElementById('opts');
+  const h=n<=3?210:n<=5?150:120, fs=n<=3?42:n<=5?34:30, gap=n<=3?26:n<=5?18:12;
+  box.style.setProperty('--ps',(n<=3?26:n<=5?22:20)+'px');box.style.setProperty('--h',h+'px');box.style.setProperty('--fs',fs+'px');box.style.setProperty('--gap',gap+'px');
+  box.innerHTML=OPTS.slice(0,n).map((o,i)=>`<div class="opt${o.lock?' lock':''}${i==0?' hot':''}" style="--c:${o.c}"><span class="gl">${o.g}</span><div class="t"><b>${o.t}</b>${o.src?`<span class="src">${o.src}</span>`:''}<p>${o.p}</p></div><span class="num">${o.n}</span></div>`).join('');
+  document.getElementById('restnote').textContent=`선택지 ${n}개 · 칸 높이 ${h}px(3개까지 210 · 4~5개 150 · 6개 이상 120) · 목록 영역 1200×800 안에서 가운데 정렬 · 잠긴 선택지는 이유를 숫자 자리에`;
+}
+
+function route(){
+  const h=(location.hash||'#map').slice(1);
+  const [name,arg]=h.split('-');
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id==='s-'+name));
+  document.querySelectorAll('#tabs a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+h));
+  if(name==='rest')rest(+(arg||3));
+  if(name==='start'){const el=arg?document.querySelector(`.pick[data-i="${arg}"]`):null;pick(el);if(el)term.classList.remove('glitch')}
+}
+addEventListener('hashchange',route);route();
+</script>
+</body>
+</html>
